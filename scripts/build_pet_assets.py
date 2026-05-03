@@ -11,6 +11,7 @@ from PIL import Image, ImageDraw, ImageFilter, ImageFont
 ROOT = Path(__file__).resolve().parents[1]
 SOURCE = ROOT / "assets" / "source" / "gpzz_sheet_green.png"
 SPECIAL_SOURCE = ROOT / "assets" / "source" / "special_reactions_sheet_green.png"
+HALF_RIGHT_SOURCE = ROOT / "assets" / "source" / "half_right_cold_sheet_green.png"
 OUTPUT = ROOT / "assets" / "generated"
 FRAMES_DIR = OUTPUT / "frames"
 SPRITE_SHEET = OUTPUT / "sprite_sheet.png"
@@ -39,7 +40,7 @@ REAL_FRAME_ACTIONS = {
     "idle": "idle_sheet_green.png",
     "wave": "wave_sheet_green.png",
     "typing": "typing_sheet_green.png",
-    "sweep": "sweep_sheet_green.png",
+    "sweep": "sweep_maid_sheet_green.png",
     "sleep": "sleep_sheet_green.png",
     "pout": "pout_sheet_green.png",
     "surprise": "surprise_sheet_green.png",
@@ -64,7 +65,7 @@ SPECIAL_SHEET_ROWS = {
     "agi_box": 2,
 }
 SPECIAL_MAX_SIZES = {
-    "half_right": 152,
+    "half_right": 138,
     "welcome_agi": 136,
     "agi_box": 150,
 }
@@ -275,6 +276,36 @@ def alpha_bbox_all(image: Image.Image) -> tuple[int, int, int, int]:
     return bbox
 
 
+def remove_small_alpha_components(image: Image.Image, min_area: int = 90) -> Image.Image:
+    rgba = image.convert("RGBA")
+    alpha = rgba.getchannel("A")
+    width, height = rgba.size
+    pixels = alpha.load()
+    out_pixels = rgba.load()
+    visited: set[tuple[int, int]] = set()
+
+    for y in range(height):
+        for x in range(width):
+            if pixels[x, y] <= ALPHA_CUTOFF or (x, y) in visited:
+                continue
+
+            stack = [(x, y)]
+            visited.add((x, y))
+            component: list[tuple[int, int]] = []
+            while stack:
+                cx, cy = stack.pop()
+                component.append((cx, cy))
+                for nx, ny in ((cx - 1, cy), (cx + 1, cy), (cx, cy - 1), (cx, cy + 1)):
+                    if 0 <= nx < width and 0 <= ny < height and pixels[nx, ny] > ALPHA_CUTOFF and (nx, ny) not in visited:
+                        visited.add((nx, ny))
+                        stack.append((nx, ny))
+
+            if len(component) < min_area:
+                for px, py in component:
+                    out_pixels[px, py] = (0, 0, 0, 0)
+    return rgba
+
+
 def fit_pose(image: Image.Image, max_size: int = 136) -> Image.Image:
     bbox = alpha_bbox(image)
     pose = image.crop(bbox)
@@ -432,7 +463,7 @@ def build_real_frames(action: str, action_dir: Path) -> list[Path]:
             if bbox_areas[replacement_index] < median_area * 0.55:
                 replacement_index = (frame_index - 1) % len(raw_frames)
             raw_frame = raw_frames[replacement_index]
-        pose = fit_pose(raw_frame)
+        pose = fit_special_frame(raw_frame, max_size=150) if action == "sweep" else fit_pose(raw_frame)
         frame = Image.new("RGBA", (CELL_SIZE, CELL_SIZE), (0, 0, 0, 0))
         add_shadow(frame, 1.0)
         x = (CELL_SIZE - pose.width) // 2
@@ -521,17 +552,46 @@ def draw_agi_box_frame(frame: Image.Image, frame_index: int) -> Image.Image:
     return canvas
 
 
+def stabilize_half_right_frames(frames: list[Image.Image]) -> list[Image.Image]:
+    if not frames:
+        return frames
+
+    base = frames[0].convert("RGBA")
+    split_y = 106
+    offsets = (0, -2, 0, 2, 0, -2)
+    stabilized: list[Image.Image] = []
+    for index, frame in enumerate(frames):
+        current = frame.convert("RGBA")
+        lower = base.copy()
+        lower_pixels = lower.load()
+        for y in range(split_y):
+            for x in range(lower.width):
+                lower_pixels[x, y] = (0, 0, 0, 0)
+
+        upper = current.crop((0, 0, current.width, split_y))
+        composed = lower
+        composed.alpha_composite(upper, (offsets[index % len(offsets)], 0))
+        stabilized.append(composed)
+    return stabilized
+
+
 def build_special_frames(action: str, action_dir: Path) -> list[Path]:
-    if not SPECIAL_SOURCE.exists():
+    if action == "half_right" and HALF_RIGHT_SOURCE.exists():
+        sheet = remove_green(Image.open(HALF_RIGHT_SOURCE))
+        row = 0
+        row_count = 1
+    elif SPECIAL_SOURCE.exists():
+        sheet = remove_green(Image.open(SPECIAL_SOURCE))
+        row = SPECIAL_SHEET_ROWS[action]
+        row_count = len(SPECIAL_SHEET_ROWS)
+    else:
         raise FileNotFoundError(f"Missing generated special reaction sheet: {SPECIAL_SOURCE}")
     if action not in SPECIAL_SHEET_ROWS:
         raise ValueError(f"Unknown special action: {action}")
 
-    sheet = remove_green(Image.open(SPECIAL_SOURCE))
     cell_w = sheet.width / SPECIAL_FRAME_COUNT
-    cell_h = sheet.height / len(SPECIAL_SHEET_ROWS)
-    row = SPECIAL_SHEET_ROWS[action]
-    frame_paths: list[Path] = []
+    cell_h = sheet.height / row_count
+    rendered_frames: list[Image.Image] = []
     for frame_index in range(SPECIAL_FRAME_COUNT):
         left = round(frame_index * cell_w)
         upper = round(row * cell_h)
@@ -541,12 +601,24 @@ def build_special_frames(action: str, action_dir: Path) -> list[Path]:
         if action == "welcome_agi":
             top_trim = round(cell_h * 0.10)
             source_frame = source_frame.crop((0, top_trim, source_frame.width, source_frame.height))
+        if action == "half_right":
+            source_frame = remove_small_alpha_components(source_frame)
         pose = fit_special_frame(source_frame, max_size=SPECIAL_MAX_SIZES.get(action, 152))
+        if action == "half_right":
+            pose = remove_small_alpha_components(pose)
         frame = Image.new("RGBA", (CELL_SIZE, CELL_SIZE), (0, 0, 0, 0))
         x = (CELL_SIZE - pose.width) // 2
         y = (CELL_SIZE - pose.height) // 2 + (-2 if action == "welcome_agi" else 0)
         frame.alpha_composite(pose, (x, y))
+        if action == "half_right":
+            clean = Image.new("RGBA", frame.size, (0, 0, 0, 0))
+            clean.alpha_composite(frame.crop((30, 0, CELL_SIZE, CELL_SIZE)), (30, 0))
+            frame = clean
         frame = harden_alpha(frame, threshold=64)
+        rendered_frames.append(frame)
+
+    frame_paths: list[Path] = []
+    for frame_index, frame in enumerate(rendered_frames):
         frame_path = action_dir / f"{frame_index:02}.png"
         frame.save(frame_path)
         frame_paths.append(frame_path)

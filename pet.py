@@ -65,6 +65,8 @@ BEHAVIOR_TICK_MS = 120
 MANUAL_OVERRIDE_MS = 45000
 HOVER_OVERRIDE_MS = 9000
 MENU_ACTION_LOCK_MS = 3000
+PASSIVE_REACTION_MIN_MS = 14000
+PASSIVE_REACTION_MAX_MS = 28000
 FOLLOW_RADIUS = 286
 FOLLOW_STOP_RADIUS = 90
 FOLLOW_STEP = 8
@@ -134,6 +136,7 @@ class DesktopPet:
         self.manual_override_until = 0
         self.action_lock_until = 0
         self.status_until = 0
+        self.next_passive_reaction_at = 0
         self.is_hovering = False
         self.facing = "right"
         self.wander_target_x: int | None = None
@@ -221,6 +224,19 @@ class DesktopPet:
 
     def is_action_locked(self) -> bool:
         return self.now_ms() < self.action_lock_until
+
+    def weighted_action(self, choices: list[tuple[str, int]]) -> str:
+        total = sum(weight for _, weight in choices)
+        pick = random.randint(1, total)
+        running = 0
+        for action_name, weight in choices:
+            running += weight
+            if pick <= running:
+                return action_name
+        return choices[-1][0]
+
+    def schedule_next_passive_reaction(self) -> None:
+        self.next_passive_reaction_at = self.now_ms() + random.randint(PASSIVE_REACTION_MIN_MS, PASSIVE_REACTION_MAX_MS)
 
     def get_status_font(self, size: int) -> ImageFont.FreeTypeFont | ImageFont.ImageFont:
         for font_path in STATUS_FONT_FILES:
@@ -565,6 +581,8 @@ class DesktopPet:
         elif self.smart_job:
             self.root.after_cancel(self.smart_job)
             self.smart_job = None
+        if not enabled:
+            self.schedule_next_passive_reaction()
 
     def set_mouse_follow_enabled(self, enabled: bool) -> None:
         self.mouse_follow_enabled = enabled
@@ -611,18 +629,41 @@ class DesktopPet:
 
     def choose_action_for_state(self, state: PCState) -> tuple[str, str]:
         if state.idle_seconds >= 600:
-            return "sleep", "자리비움"
+            return self.weighted_action([("sleep", 5), ("agi_box", 2), ("sit", 1)]), "자리비움"
         if state.battery_percent is not None and state.battery_percent <= 20:
-            return "pout", f"배터리 {state.battery_percent}%"
+            return self.weighted_action([("pout", 5), ("agi_box", 3), ("sleep", 1)]), f"배터리 {state.battery_percent}%"
         if state.on_ac_power and state.battery_percent is not None and state.battery_percent < 100:
-            return "cheer", f"충전중 {state.battery_percent}%"
+            return self.weighted_action([("cheer", 5), ("welcome_agi", 2), ("typing", 1)]), f"충전중 {state.battery_percent}%"
         if 0 <= state.hour < 6:
-            return "sleep", "늦은 밤"
+            return self.weighted_action([("sleep", 5), ("sit", 2), ("agi_box", 1)]), "늦은 밤"
         if state.idle_seconds >= 120:
-            return "sit", "쉬는중"
+            return self.weighted_action([("sit", 5), ("think", 3), ("sweep", 2), ("agi_box", 1)]), "쉬는중"
         if state.idle_seconds < 15:
-            return random.choice(["typing", "think", "surprise"]), "활동중"
-        return random.choice(["idle", "wave", "typing", "think", "sweep"]), "대기중"
+            return self.weighted_action(
+                [("typing", 4), ("think", 3), ("half_right", 2), ("surprise", 1), ("welcome_agi", 1)]
+            ), "활동중"
+        if state.idle_seconds < 90:
+            return self.weighted_action(
+                [("idle", 3), ("typing", 2), ("think", 2), ("wave", 2), ("sweep", 1), ("half_right", 1)]
+            ), "대기중"
+        return self.weighted_action(
+            [("idle", 3), ("think", 3), ("wave", 2), ("sweep", 2), ("sit", 2), ("half_right", 1), ("welcome_agi", 1), ("agi_box", 1)]
+        ), "대기중"
+
+    def choose_passive_action(self) -> tuple[str, str]:
+        action = self.weighted_action(
+            [
+                ("idle", 4),
+                ("wave", 3),
+                ("think", 3),
+                ("sit", 2),
+                ("sweep", 2),
+                ("half_right", 2),
+                ("welcome_agi", 1),
+                ("agi_box", 1),
+            ]
+        )
+        return action, ACTION_LABELS.get(action, "대기중")
 
     def schedule_smart_update(self, initial: bool = False) -> None:
         if self.smart_job:
@@ -669,6 +710,8 @@ class DesktopPet:
         self.root.geometry(f"+{x}+{y}")
 
     def maybe_start_wander(self) -> None:
+        if not self.smart_mode:
+            return
         if self.wander_target_x is not None or self.is_hovering or self.now_ms() < self.manual_override_until:
             return
         if random.random() > 0.01:
@@ -686,7 +729,7 @@ class DesktopPet:
         distance, dx, dy = self.distance_to_cursor()
         if distance > FOLLOW_RADIUS:
             if self.last_pointer_mode and self.wander_target_x is None and self.action == "walk":
-                self.set_action(random.choice(["idle", "think", "sit"]), label="놓쳤다")
+                self.set_action(random.choice(["idle", "think", "sit", "agi_box"]), label="놓쳤다")
             self.last_pointer_mode = False
             return False
 
@@ -694,7 +737,7 @@ class DesktopPet:
         self.last_pointer_mode = True
         if distance <= FOLLOW_STOP_RADIUS:
             if self.action != "wave":
-                self.set_action(random.choice(["wave", "surprise", "cheer"]), label="반응중")
+                self.set_action(random.choice(["wave", "surprise", "cheer", "half_right", "welcome_agi"]), label="반응중")
             return True
 
         step_x = int(max(-FOLLOW_STEP, min(FOLLOW_STEP, dx * 0.14)))
@@ -718,6 +761,15 @@ class DesktopPet:
         self.move_by(WANDER_STEP if delta > 0 else -WANDER_STEP, 0)
         self.set_action("walk", label="산책중")
 
+    def apply_passive_reaction(self) -> None:
+        if self.smart_mode or self.is_hovering or self.wander_target_x is not None:
+            return
+        if self.now_ms() < self.manual_override_until or self.now_ms() < self.next_passive_reaction_at:
+            return
+        action, label = self.choose_passive_action()
+        self.set_action(action, label=label, manual=True, hold_ms=random.randint(5000, 9000))
+        self.schedule_next_passive_reaction()
+
     def schedule_behavior_tick(self, initial: bool = False) -> None:
         if self.behavior_job:
             self.root.after_cancel(self.behavior_job)
@@ -733,8 +785,11 @@ class DesktopPet:
             return
         handled = self.apply_mouse_follow()
         if not handled:
-            self.maybe_start_wander()
-            self.apply_wander()
+            if self.smart_mode:
+                self.maybe_start_wander()
+                self.apply_wander()
+            else:
+                self.apply_passive_reaction()
         self.schedule_behavior_tick()
 
     def start_drag(self, event: tk.Event[tk.Misc]) -> None:
@@ -755,14 +810,19 @@ class DesktopPet:
             return
         if 0 <= event.x <= self.canvas.winfo_width() and 0 <= event.y <= self.canvas.winfo_height():
             self.wander_target_x = None
-            self.set_action(random.choice(["wave", "cheer", "surprise"]), label="클릭!", manual=True)
+            self.set_action(random.choice(["wave", "cheer", "surprise", "half_right", "welcome_agi"]), label="클릭!", manual=True)
 
     def on_hover_enter(self, _event: tk.Event[tk.Misc]) -> None:
         if self.is_action_locked():
             return
         self.is_hovering = True
         self.wander_target_x = None
-        self.set_action(random.choice(["wave", "cheer", "surprise"]), label="어서와", manual=True, hold_ms=HOVER_OVERRIDE_MS)
+        self.set_action(
+            random.choice(["wave", "cheer", "surprise", "half_right", "welcome_agi"]),
+            label="어서와",
+            manual=True,
+            hold_ms=HOVER_OVERRIDE_MS,
+        )
 
     def on_hover_leave(self, _event: tk.Event[tk.Misc]) -> None:
         if self.is_action_locked():
