@@ -63,6 +63,11 @@ SPECIAL_SHEET_ROWS = {
     "welcome_agi": 1,
     "agi_box": 2,
 }
+SPECIAL_MAX_SIZES = {
+    "half_right": 152,
+    "welcome_agi": 136,
+    "agi_box": 150,
+}
 SPECIAL_FRAME_COUNT = 6
 FONT_FILES = [
     Path("C:/Windows/Fonts/H2SA1M.TTF"),
@@ -533,10 +538,13 @@ def build_special_frames(action: str, action_dir: Path) -> list[Path]:
         right = round((frame_index + 1) * cell_w)
         lower = round((row + 1) * cell_h)
         source_frame = sheet.crop((left, upper, right, lower))
-        pose = fit_special_frame(source_frame)
+        if action == "welcome_agi":
+            top_trim = round(cell_h * 0.10)
+            source_frame = source_frame.crop((0, top_trim, source_frame.width, source_frame.height))
+        pose = fit_special_frame(source_frame, max_size=SPECIAL_MAX_SIZES.get(action, 152))
         frame = Image.new("RGBA", (CELL_SIZE, CELL_SIZE), (0, 0, 0, 0))
         x = (CELL_SIZE - pose.width) // 2
-        y = (CELL_SIZE - pose.height) // 2
+        y = (CELL_SIZE - pose.height) // 2 + (-2 if action == "welcome_agi" else 0)
         frame.alpha_composite(pose, (x, y))
         frame = harden_alpha(frame, threshold=64)
         frame_path = action_dir / f"{frame_index:02}.png"
