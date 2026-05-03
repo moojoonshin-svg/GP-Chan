@@ -45,7 +45,7 @@ ACTION_LABELS = {
     "sweep": "청소 중",
     "walk": "산책 중",
     "half_right": "반만 맞습니다",
-    "welcome_agi": "AGI 맞이",
+    "welcome_agi": "AGI 즈라",
     "agi_box": "박스행",
 }
 SCALE_CHOICES = [1.0, 1.5, 2.0, 2.5, 3.0]
