@@ -1,0 +1,159 @@
+{
+  "cell_size": 160,
+  "frame_count": 8,
+  "actions": {
+    "idle": {
+      "display_name": "Idle",
+      "frames": [
+        "assets/generated/frames/idle/00.png",
+        "assets/generated/frames/idle/01.png",
+        "assets/generated/frames/idle/02.png",
+        "assets/generated/frames/idle/03.png",
+        "assets/generated/frames/idle/04.png",
+        "assets/generated/frames/idle/05.png",
+        "assets/generated/frames/idle/06.png",
+        "assets/generated/frames/idle/07.png"
+      ],
+      "frame_duration_ms": 220
+    },
+    "wave": {
+      "display_name": "Wave",
+      "frames": [
+        "assets/generated/frames/wave/00.png",
+        "assets/generated/frames/wave/01.png",
+        "assets/generated/frames/wave/02.png",
+        "assets/generated/frames/wave/03.png",
+        "assets/generated/frames/wave/04.png",
+        "assets/generated/frames/wave/05.png",
+        "assets/generated/frames/wave/06.png",
+        "assets/generated/frames/wave/07.png"
+      ],
+      "frame_duration_ms": 180
+    },
+    "typing": {
+      "display_name": "Typing",
+      "frames": [
+        "assets/generated/frames/typing/00.png",
+        "assets/generated/frames/typing/01.png",
+        "assets/generated/frames/typing/02.png",
+        "assets/generated/frames/typing/03.png",
+        "assets/generated/frames/typing/04.png",
+        "assets/generated/frames/typing/05.png",
+        "assets/generated/frames/typing/06.png",
+        "assets/generated/frames/typing/07.png"
+      ],
+      "frame_duration_ms": 220
+    },
+    "sweep": {
+      "display_name": "Sweep",
+      "frames": [
+        "assets/generated/frames/sweep/00.png",
+        "assets/generated/frames/sweep/01.png",
+        "assets/generated/frames/sweep/02.png",
+        "assets/generated/frames/sweep/03.png",
+        "assets/generated/frames/sweep/04.png",
+        "assets/generated/frames/sweep/05.png",
+        "assets/generated/frames/sweep/06.png",
+        "assets/generated/frames/sweep/07.png"
+      ],
+      "frame_duration_ms": 180
+    },
+    "sleep": {
+      "display_name": "Sleep",
+      "frames": [
+        "assets/generated/frames/sleep/00.png",
+        "assets/generated/frames/sleep/01.png",
+        "assets/generated/frames/sleep/02.png",
+        "assets/generated/frames/sleep/03.png",
+        "assets/generated/frames/sleep/04.png",
+        "assets/generated/frames/sleep/05.png",
+        "assets/generated/frames/sleep/06.png",
+        "assets/generated/frames/sleep/07.png"
+      ],
+      "frame_duration_ms": 220
+    },
+    "pout": {
+      "display_name": "Pout",
+      "frames": [
+        "assets/generated/frames/pout/00.png",
+        "assets/generated/frames/pout/01.png",
+        "assets/generated/frames/pout/02.png",
+        "assets/generated/frames/pout/03.png",
+        "assets/generated/frames/pout/04.png",
+        "assets/generated/frames/pout/05.png",
+        "assets/generated/frames/pout/06.png",
+        "assets/generated/frames/pout/07.png"
+      ],
+      "frame_duration_ms": 180
+    },
+    "surprise": {
+      "display_name": "Surprise",
+      "frames": [
+        "assets/generated/frames/surprise/00.png",
+        "assets/generated/frames/surprise/01.png",
+        "assets/generated/frames/surprise/02.png",
+        "assets/generated/frames/surprise/03.png",
+        "assets/generated/frames/surprise/04.png",
+        "assets/generated/frames/surprise/05.png",
+        "assets/generated/frames/surprise/06.png",
+        "assets/generated/frames/surprise/07.png"
+      ],
+      "frame_duration_ms": 180
+    },
+    "think": {
+      "display_name": "Think",
+      "frames": [
+        "assets/generated/frames/think/00.png",
+        "assets/generated/frames/think/01.png",
+        "assets/generated/frames/think/02.png",
+        "assets/generated/frames/think/03.png",
+        "assets/generated/frames/think/04.png",
+        "assets/generated/frames/think/05.png",
+        "assets/generated/frames/think/06.png",
+        "assets/generated/frames/think/07.png"
+      ],
+      "frame_duration_ms": 180
+    },
+    "cheer": {
+      "display_name": "Cheer",
+      "frames": [
+        "assets/generated/frames/cheer/00.png",
+        "assets/generated/frames/cheer/01.png",
+        "assets/generated/frames/cheer/02.png",
+        "assets/generated/frames/cheer/03.png",
+        "assets/generated/frames/cheer/04.png",
+        "assets/generated/frames/cheer/05.png",
+        "assets/generated/frames/cheer/06.png",
+        "assets/generated/frames/cheer/07.png"
+      ],
+      "frame_duration_ms": 180
+    },
+    "sit": {
+      "display_name": "Sit",
+      "frames": [
+        "assets/generated/frames/sit/00.png",
+        "assets/generated/frames/sit/01.png",
+        "assets/generated/frames/sit/02.png",
+        "assets/generated/frames/sit/03.png",
+        "assets/generated/frames/sit/04.png",
+        "assets/generated/frames/sit/05.png",
+        "assets/generated/frames/sit/06.png",
+        "assets/generated/frames/sit/07.png"
+      ],
+      "frame_duration_ms": 180
+    },
+    "walk": {
+      "display_name": "Walk",
+      "frames": [
+        "assets/generated/frames/walk/00.png",
+        "assets/generated/frames/walk/01.png",
+        "assets/generated/frames/walk/02.png",
+        "assets/generated/frames/walk/03.png",
+        "assets/generated/frames/walk/04.png",
+        "assets/generated/frames/walk/05.png",
+        "assets/generated/frames/walk/06.png"
+      ],
+      "frame_duration_ms": 160
+    }
+  }
+}
