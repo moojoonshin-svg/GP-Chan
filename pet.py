@@ -16,7 +16,22 @@ from PIL import Image, ImageDraw, ImageFont, ImageTk
 ROOT = Path(__file__).resolve().parent
 MANIFEST_PATH = ROOT / "assets" / "generated" / "manifest.json"
 WINDOW_CHROMA = "#010203"
-DEFAULT_ACTIONS = ["idle", "wave", "think", "typing", "cheer", "sit", "sleep", "pout", "surprise", "sweep", "walk"]
+DEFAULT_ACTIONS = [
+    "idle",
+    "wave",
+    "think",
+    "typing",
+    "cheer",
+    "sit",
+    "sleep",
+    "pout",
+    "surprise",
+    "sweep",
+    "walk",
+    "half_right",
+    "welcome_agi",
+    "agi_box",
+]
 ACTION_LABELS = {
     "idle": "쉬는 중",
     "wave": "손 흔드는 중",
@@ -29,6 +44,9 @@ ACTION_LABELS = {
     "surprise": "놀라는 중",
     "sweep": "청소 중",
     "walk": "산책 중",
+    "half_right": "반만 맞습니다",
+    "welcome_agi": "AGI 맞이",
+    "agi_box": "박스행",
 }
 SCALE_CHOICES = [1.0, 1.5, 2.0, 2.5, 3.0]
 DEFAULT_SCALE = 1.0

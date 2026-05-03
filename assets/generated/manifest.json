@@ -154,6 +154,44 @@
         "assets/generated/frames/walk/06.png"
       ],
       "frame_duration_ms": 160
+    },
+    "half_right": {
+      "display_name": "Half Right",
+      "frames": [
+        "assets/generated/frames/half_right/00.png",
+        "assets/generated/frames/half_right/01.png",
+        "assets/generated/frames/half_right/02.png",
+        "assets/generated/frames/half_right/03.png",
+        "assets/generated/frames/half_right/04.png",
+        "assets/generated/frames/half_right/05.png"
+      ],
+      "frame_duration_ms": 260
+    },
+    "welcome_agi": {
+      "display_name": "Welcome AGI",
+      "frames": [
+        "assets/generated/frames/welcome_agi/00.png",
+        "assets/generated/frames/welcome_agi/01.png",
+        "assets/generated/frames/welcome_agi/02.png",
+        "assets/generated/frames/welcome_agi/03.png",
+        "assets/generated/frames/welcome_agi/04.png",
+        "assets/generated/frames/welcome_agi/05.png",
+        "assets/generated/frames/welcome_agi/06.png",
+        "assets/generated/frames/welcome_agi/07.png"
+      ],
+      "frame_duration_ms": 160
+    },
+    "agi_box": {
+      "display_name": "AGI Box",
+      "frames": [
+        "assets/generated/frames/agi_box/00.png",
+        "assets/generated/frames/agi_box/01.png",
+        "assets/generated/frames/agi_box/02.png",
+        "assets/generated/frames/agi_box/03.png",
+        "assets/generated/frames/agi_box/04.png",
+        "assets/generated/frames/agi_box/05.png"
+      ],
+      "frame_duration_ms": 220
     }
   }
 }
