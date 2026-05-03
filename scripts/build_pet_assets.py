@@ -10,6 +10,7 @@ from PIL import Image, ImageDraw, ImageFilter, ImageFont
 
 ROOT = Path(__file__).resolve().parents[1]
 SOURCE = ROOT / "assets" / "source" / "gpzz_sheet_green.png"
+SPECIAL_SOURCE = ROOT / "assets" / "source" / "special_reactions_sheet_green.png"
 OUTPUT = ROOT / "assets" / "generated"
 FRAMES_DIR = OUTPUT / "frames"
 SPRITE_SHEET = OUTPUT / "sprite_sheet.png"
@@ -57,6 +58,12 @@ SPECIAL_DURATIONS = {
     "welcome_agi": 160,
     "agi_box": 220,
 }
+SPECIAL_SHEET_ROWS = {
+    "half_right": 0,
+    "welcome_agi": 1,
+    "agi_box": 2,
+}
+SPECIAL_FRAME_COUNT = 6
 FONT_FILES = [
     Path("C:/Windows/Fonts/H2SA1M.TTF"),
     Path("C:/Windows/Fonts/HMKMAMI.TTF"),
@@ -254,6 +261,15 @@ def alpha_bbox(image: Image.Image) -> tuple[int, int, int, int]:
     return best_bbox
 
 
+def alpha_bbox_all(image: Image.Image) -> tuple[int, int, int, int]:
+    alpha = image.getchannel("A")
+    mask = alpha.point(lambda value: 255 if value > ALPHA_CUTOFF else 0)
+    bbox = mask.getbbox()
+    if not bbox:
+        raise ValueError("No visible pixels found in frame.")
+    return bbox
+
+
 def fit_pose(image: Image.Image, max_size: int = 136) -> Image.Image:
     bbox = alpha_bbox(image)
     pose = image.crop(bbox)
@@ -264,6 +280,17 @@ def fit_pose(image: Image.Image, max_size: int = 136) -> Image.Image:
         Image.Resampling.LANCZOS,
     )
     return resized
+
+
+def fit_special_frame(image: Image.Image, max_size: int = 152) -> Image.Image:
+    bbox = alpha_bbox_all(image)
+    pose = image.crop(bbox)
+    scale = min(max_size / pose.width, max_size / pose.height)
+    return resize_rgba_premultiplied(
+        pose,
+        (max(1, round(pose.width * scale)), max(1, round(pose.height * scale))),
+        Image.Resampling.LANCZOS,
+    )
 
 
 def harden_alpha(image: Image.Image, threshold: int = HARD_ALPHA_THRESHOLD) -> Image.Image:
@@ -490,21 +517,28 @@ def draw_agi_box_frame(frame: Image.Image, frame_index: int) -> Image.Image:
 
 
 def build_special_frames(action: str, action_dir: Path) -> list[Path]:
-    if action == "half_right":
-        source_frames = [load_generated_frame("think", i % 8) for i in range(6)]
-        renderer = draw_half_right_frame
-    elif action == "welcome_agi":
-        source_frames = [load_generated_frame("cheer", i % 8) for i in range(8)]
-        renderer = draw_welcome_agi_frame
-    elif action == "agi_box":
-        source_frames = [load_generated_frame("pout", i % 8) for i in range(6)]
-        renderer = draw_agi_box_frame
-    else:
+    if not SPECIAL_SOURCE.exists():
+        raise FileNotFoundError(f"Missing generated special reaction sheet: {SPECIAL_SOURCE}")
+    if action not in SPECIAL_SHEET_ROWS:
         raise ValueError(f"Unknown special action: {action}")
 
+    sheet = remove_green(Image.open(SPECIAL_SOURCE))
+    cell_w = sheet.width / SPECIAL_FRAME_COUNT
+    cell_h = sheet.height / len(SPECIAL_SHEET_ROWS)
+    row = SPECIAL_SHEET_ROWS[action]
     frame_paths: list[Path] = []
-    for frame_index, source_frame in enumerate(source_frames):
-        frame = renderer(source_frame, frame_index)
+    for frame_index in range(SPECIAL_FRAME_COUNT):
+        left = round(frame_index * cell_w)
+        upper = round(row * cell_h)
+        right = round((frame_index + 1) * cell_w)
+        lower = round((row + 1) * cell_h)
+        source_frame = sheet.crop((left, upper, right, lower))
+        pose = fit_special_frame(source_frame)
+        frame = Image.new("RGBA", (CELL_SIZE, CELL_SIZE), (0, 0, 0, 0))
+        x = (CELL_SIZE - pose.width) // 2
+        y = (CELL_SIZE - pose.height) // 2
+        frame.alpha_composite(pose, (x, y))
+        frame = harden_alpha(frame, threshold=64)
         frame_path = action_dir / f"{frame_index:02}.png"
         frame.save(frame_path)
         frame_paths.append(frame_path)

@@ -175,9 +175,7 @@
         "assets/generated/frames/welcome_agi/02.png",
         "assets/generated/frames/welcome_agi/03.png",
         "assets/generated/frames/welcome_agi/04.png",
-        "assets/generated/frames/welcome_agi/05.png",
-        "assets/generated/frames/welcome_agi/06.png",
-        "assets/generated/frames/welcome_agi/07.png"
+        "assets/generated/frames/welcome_agi/05.png"
       ],
       "frame_duration_ms": 160
     },
