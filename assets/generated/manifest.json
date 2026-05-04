@@ -190,6 +190,34 @@
         "assets/generated/frames/agi_box/05.png"
       ],
       "frame_duration_ms": 220
+    },
+    "drag_dangle": {
+      "display_name": "Drag_Dangle",
+      "frames": [
+        "assets/generated/frames/drag_dangle/00.png",
+        "assets/generated/frames/drag_dangle/01.png",
+        "assets/generated/frames/drag_dangle/02.png",
+        "assets/generated/frames/drag_dangle/03.png",
+        "assets/generated/frames/drag_dangle/04.png",
+        "assets/generated/frames/drag_dangle/05.png",
+        "assets/generated/frames/drag_dangle/06.png",
+        "assets/generated/frames/drag_dangle/07.png"
+      ],
+      "frame_duration_ms": 180
+    },
+    "scroll_tickle": {
+      "display_name": "Scroll_Tickle",
+      "frames": [
+        "assets/generated/frames/scroll_tickle/00.png",
+        "assets/generated/frames/scroll_tickle/01.png",
+        "assets/generated/frames/scroll_tickle/02.png",
+        "assets/generated/frames/scroll_tickle/03.png",
+        "assets/generated/frames/scroll_tickle/04.png",
+        "assets/generated/frames/scroll_tickle/05.png",
+        "assets/generated/frames/scroll_tickle/06.png",
+        "assets/generated/frames/scroll_tickle/07.png"
+      ],
+      "frame_duration_ms": 180
     }
   }
 }
