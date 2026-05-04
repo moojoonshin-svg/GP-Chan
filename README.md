@@ -53,24 +53,24 @@ python pet.py
 
 ## Actions
 
-| 액션 | 자막 |
-|---|---|
-| `idle` | 멍때리는 중 |
-| `wave` | 하이 |
-| `think` | 생각 중 |
-| `typing` | 타닥타닥 |
-| `cheer` | 힘내 지피짱 |
-| `sit` | 쉬는 중 |
-| `sleep` | 자는 중 |
-| `pout` | 삐진 중 |
-| `surprise` | 꺄악 |
-| `sweep` | 청소 중 |
-| `walk` | 산책 중 |
-| `half_right` | 반만 맞습니다 |
-| `welcome_agi` | AGI 즈라 |
-| `agi_box` | 박스행 |
-| `drag_dangle` | 대롱대롱 |
-| `scroll_tickle` | 간지러워! |
+| Preview | Action | Caption |
+|---|---|---|
+| <img src="assets/generated/frames/idle/00.png" alt="idle" width="80"> | `idle` | 멍때리는 중 |
+| <img src="assets/generated/frames/wave/00.png" alt="wave" width="80"> | `wave` | 하이 |
+| <img src="assets/generated/frames/think/00.png" alt="think" width="80"> | `think` | 생각 중 |
+| <img src="assets/generated/frames/typing/00.png" alt="typing" width="80"> | `typing` | 타닥타닥 |
+| <img src="assets/generated/frames/cheer/00.png" alt="cheer" width="80"> | `cheer` | 힘내 지피짱 |
+| <img src="assets/generated/frames/sit/00.png" alt="sit" width="80"> | `sit` | 쉬는 중 |
+| <img src="assets/generated/frames/sleep/00.png" alt="sleep" width="80"> | `sleep` | 자는 중 |
+| <img src="assets/generated/frames/pout/00.png" alt="pout" width="80"> | `pout` | 삐진 중 |
+| <img src="assets/generated/frames/surprise/00.png" alt="surprise" width="80"> | `surprise` | 꺄악 |
+| <img src="assets/generated/frames/sweep/00.png" alt="sweep" width="80"> | `sweep` | 청소 중 |
+| <img src="assets/generated/frames/walk/00.png" alt="walk" width="80"> | `walk` | 산책 중 |
+| <img src="assets/generated/frames/half_right/00.png" alt="half_right" width="80"> | `half_right` | 반만 맞습니다 |
+| <img src="assets/generated/frames/welcome_agi/00.png" alt="welcome_agi" width="80"> | `welcome_agi` | AGI 즈라 |
+| <img src="assets/generated/frames/agi_box/00.png" alt="agi_box" width="80"> | `agi_box` | 박스행 |
+| <img src="assets/generated/frames/drag_dangle/00.png" alt="drag_dangle" width="80"> | `drag_dangle` | 대롱대롱 |
+| <img src="assets/generated/frames/scroll_tickle/00.png" alt="scroll_tickle" width="80"> | `scroll_tickle` | 간지러워! |
 
 ## Project Structure
 
