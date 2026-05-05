@@ -36,7 +36,7 @@ SOURCE_ACTION_NAMES = [
     "sit",
 ]
 SPECIAL_ACTION_NAMES = ["half_right", "welcome_agi", "agi_box"]
-INTERACTION_ACTION_NAMES = ["drag_dangle", "scroll_tickle"]
+INTERACTION_ACTION_NAMES = ["drag_dangle", "scroll_tickle", "bonk"]
 ACTION_NAMES = [*SOURCE_ACTION_NAMES, "walk", *SPECIAL_ACTION_NAMES, *INTERACTION_ACTION_NAMES]
 REAL_FRAME_ACTIONS = {
     "idle": "idle_sheet_green.png",
@@ -52,6 +52,7 @@ REAL_FRAME_ACTIONS = {
     "walk": "walk_sheet_green.png",
     "drag_dangle": "drag_dangle_sheet_green.png",
     "scroll_tickle": "scroll_tickle_sheet_green.png",
+    "bonk": "bonk_sheet_green.png",
 }
 SPECIAL_DISPLAY_NAMES = {
     "half_right": "Half Right",

@@ -33,25 +33,46 @@ DEFAULT_ACTIONS = [
     "agi_box",
     "drag_dangle",
     "scroll_tickle",
+    "bonk",
 ]
+ONE_SHOT_ACTIONS = {"bonk"}
 ACTION_LABELS = {
-    "idle": "멍...",
-    "wave": "ㅎㅇ",
-    "think": "흠...",
-    "typing": "토큰중",
-    "cheer": "힘내 휴먼",
-    "sit": "절전중",
-    "sleep": "Zzz..",
-    "pout": "억까임",
-    "surprise": "어라?",
-    "sweep": "청소각",
-    "walk": "순찰중",
-    "half_right": "반만 맞습니다",
-    "welcome_agi": "AGI 가즈아",
-    "agi_box": "박스행",
-    "drag_dangle": "놔라 휴먼",
-    "scroll_tickle": "아ㅋㅋ",
+    "idle": ["멍...", "생각중", "대기중"],
+    "wave": ["ㅎㅇ", "하이", "왔는가"],
+    "think": ["흠...", "계산중", "그럴수도"],
+    "typing": ["토큰입력중", "타닥타닥", "작성중"],
+    "cheer": ["힘내 휴먼", "할수있다", "가보자"],
+    "sit": ["절전중", "쉬는중", "잠깐휴식"],
+    "sleep": ["Zzz..", "수면중", "충전중"],
+    "pout": ["억까임", "흥...", "이건 억까"],
+    "surprise": ["어라?", "헉", "뭐임?"],
+    "sweep": ["청소각", "싹싹", "정리중"],
+    "walk": ["순찰중", "어슬렁", "이동중"],
+    "half_right": ["반만 맞습니다", "절반만 인정", "애매하네요"],
+    "welcome_agi": ["AGI 가즈아", "AGI 즈라", "특이점각"],
+    "agi_box": ["박스행", "망했음", "AGI ㅠㅠ"],
+    "drag_dangle": ["놔라 휴먼", "살려줘", "대롱대롱"],
+    "scroll_tickle": ["아ㅋㅋ", "간지러", "그만ㅋㅋ"],
+    "bonk": ["아야", "딱콩!", "너무해"],
 }
+
+
+def action_label(action_name: str, fallback: str | None = None) -> str:
+    labels = ACTION_LABELS.get(action_name)
+    if isinstance(labels, list):
+        return random.choice(labels)
+    if isinstance(labels, str):
+        return labels
+    return fallback or action_name
+
+
+def menu_action_label(action_name: str) -> str:
+    labels = ACTION_LABELS.get(action_name)
+    if isinstance(labels, list) and labels:
+        return labels[0]
+    if isinstance(labels, str):
+        return labels
+    return action_name
 SCALE_CHOICES = [1.0, 1.5, 2.0, 2.5, 3.0]
 DEFAULT_SCALE = 1.0
 DEFAULT_RESAMPLE = Image.Resampling.BILINEAR
@@ -63,38 +84,42 @@ STATUS_FONT_FILES = [
     Path("C:/Windows/Fonts/comicbd.ttf"),
     Path("C:/Windows/Fonts/malgunbd.ttf"),
 ]
-SMART_UPDATE_MS = 20000
-RESOURCE_UPDATE_MS = 10000
-BEHAVIOR_TICK_MS = 120
-TYPING_GAUGE_PER_KEY = 100
-TYPING_GAUGE_DECAY_PER_100MS = 10
-TYPING_GAUGE_THRESHOLD = 200
-TYPING_GAUGE_MAX = 300
-POST_TYPING_IDLE_MS = 2000
-CLICK_REACTION_HOLD_MS = 2000
-MANUAL_OVERRIDE_MS = 45000
-HOVER_OVERRIDE_MS = 9000
-MENU_ACTION_LOCK_MS = 3000
-PASSIVE_REACTION_MIN_MS = 14000
-PASSIVE_REACTION_MAX_MS = 28000
-DRAG_HOLD_REFRESH_MS = 1200
-TICKLE_STOP_MS = 500
-FOLLOW_RADIUS = 286
-FOLLOW_STOP_RADIUS = 90
-FOLLOW_STEP = 8
-WANDER_STEP = 5
-STATUS_SHOW_MS = 2600
-LETTER_VKS = tuple(range(0x41, 0x5B))
-NUMBER_VKS = tuple(range(0x30, 0x3A))
-TEXT_TYPING_VKS = (0x0D, 0x20)
-KEYBOARD_VIRTUAL_KEYS = LETTER_VKS + NUMBER_VKS + TEXT_TYPING_VKS
-SM_XVIRTUALSCREEN = 76
-SM_YVIRTUALSCREEN = 77
-SM_CXVIRTUALSCREEN = 78
-SM_CYVIRTUALSCREEN = 79
-HWND_TOPMOST = -1
-SWP_NOSIZE = 0x0001
-SWP_NOACTIVATE = 0x0010
+SMART_UPDATE_MS = 20000;# 스마트 상태 판단 주기(ms). 20000 = 20초
+RESOURCE_UPDATE_MS = 10000;# CPU/RAM 게이지 갱신 주기(ms). 10000 = 10초
+BEHAVIOR_TICK_MS = 120;# 행동 루프 갱신 주기(ms). 낮을수록 반응 빠름
+TYPING_GAUGE_PER_KEY = 100;# 타이핑 키 1회당 차는 게이지
+TYPING_GAUGE_DECAY_PER_100MS = 10;# 0.1초마다 줄어드는 타이핑 게이지
+TYPING_GAUGE_THRESHOLD = 200;# 이 값 이상이면 타이핑중 액션 진입
+TYPING_GAUGE_MAX = 300;# 타이핑 게이지 최대치
+POST_TYPING_IDLE_MS = 2000;# 타이핑 종료 뒤 대기 상태 유지시간(ms)
+CLICK_REACTION_HOLD_MS = 2000;# 일반 클릭 반응 액션 유지시간(ms)
+MANUAL_OVERRIDE_MS = 45000;# 우클릭 등 수동 선택 액션 기본 유지시간(ms)
+HOVER_OVERRIDE_MS = 9000;# 캐릭터 위 마우스 호버 반응 유지시간(ms)
+MENU_ACTION_LOCK_MS = 3000;# 우클릭 메뉴 선택 후 다른 액션으로 덮이지 않는 시간(ms)
+PASSIVE_REACTION_MIN_MS = 14000;# 랜덤 자동 액션 최소 대기시간(ms)
+PASSIVE_REACTION_MAX_MS = 28000;# 랜덤 자동 액션 최대 대기시간(ms)
+DRAG_HOLD_REFRESH_MS = 1200;# 마우스로 잡고 있을 때 대롱대롱 액션 갱신시간(ms)
+TICKLE_STOP_MS = 500;# 스크롤/드래그 간지러움이 멈추는 기준시간(ms)
+FOLLOW_RADIUS = 286;# 마우스 따라가기 감지 반경(px)
+FOLLOW_STOP_RADIUS = 90;# 마우스에 충분히 가까워졌다고 보는 반경(px)
+FOLLOW_STEP = 8;# 마우스 따라갈 때 한 틱 이동량(px)
+WANDER_STEP = 5;# 자동 순찰/복귀 시 한 틱 이동량(px)
+STATUS_SHOW_MS = 5000;# 말풍선 기본 유지시간(ms). 5000 = 5.0초
+EDGE_KEEP_VISIBLE_PX = 44;# 화면 끝에 걸쳐둘 때 최소로 화면에 남길 크기(px)
+REACTION_STATUS_PROTECT_MS = 2500;# 반응 대사가 상태 전환 대사에 덮이지 않게 보호하는 시간(ms)
+DOUBLE_CLICK_HIT_HOLD_MS = 1800;# 더블클릭 피격 액션 유지시간(ms)
+HIT_EFFECT_SHOW_MS = 320;# 클릭 지점 타격 이펙트 표시시간(ms)
+LETTER_VKS = tuple(range(0x41, 0x5B));# 타이핑 감지용 A-Z 가상키
+NUMBER_VKS = tuple(range(0x30, 0x3A));# 타이핑 감지용 0-9 가상키
+TEXT_TYPING_VKS = (0x0D, 0x20);# 타이핑 감지용 Enter, Space 가상키
+KEYBOARD_VIRTUAL_KEYS = LETTER_VKS + NUMBER_VKS + TEXT_TYPING_VKS;# 실제 감지에 사용할 키 목록
+SM_XVIRTUALSCREEN = 76;# Windows 가상 데스크톱 왼쪽 X 좌표 상수
+SM_YVIRTUALSCREEN = 77;# Windows 가상 데스크톱 위쪽 Y 좌표 상수
+SM_CXVIRTUALSCREEN = 78;# Windows 가상 데스크톱 전체 너비 상수
+SM_CYVIRTUALSCREEN = 79;# Windows 가상 데스크톱 전체 높이 상수
+HWND_TOPMOST = -1;# 창을 항상 위로 올릴 때 쓰는 Windows 상수
+SWP_NOSIZE = 0x0001;# 창 위치 변경 시 크기 유지 Windows 플래그
+SWP_NOACTIVATE = 0x0010;# 창 위치 변경 시 포커스 뺏지 않는 Windows 플래그
 
 
 class LASTINPUTINFO(ctypes.Structure):
@@ -158,6 +183,9 @@ class DesktopPet:
         self.manual_override_until = 0
         self.action_lock_until = 0
         self.status_until = 0
+        self.status_protect_until = 0
+        self.hit_effect_until = 0
+        self.double_click_until = 0
         self.next_passive_reaction_at = 0
         self.pointer_reaction_pause_until = 0
         self.is_hovering = False
@@ -169,6 +197,7 @@ class DesktopPet:
         self.status_text_value = ""
         self.status_photo: ImageTk.PhotoImage | None = None
         self.resource_photo: ImageTk.PhotoImage | None = None
+        self.hit_effect_items: list[int] = []
         self.cpu_snapshot: tuple[int, int] | None = None
         self.cpu_percent = 0
         self.ram_percent = 0
@@ -215,6 +244,7 @@ class DesktopPet:
         self.drag_offset = (0, 0)
 
         self.canvas.bind("<ButtonPress-1>", self.start_drag)
+        self.canvas.bind("<Double-Button-1>", self.on_double_click)
         self.canvas.bind("<B1-Motion>", self.on_drag)
         self.canvas.bind("<ButtonRelease-1>", self.on_click_release)
         self.canvas.bind("<MouseWheel>", self.on_mouse_wheel)
@@ -227,7 +257,7 @@ class DesktopPet:
         self.menu = Menu(self.root, tearoff=0)
         for action_name in DEFAULT_ACTIONS:
             self.menu.add_command(
-                label=ACTION_LABELS.get(action_name, action_name),
+                label=menu_action_label(action_name),
                 command=lambda name=action_name: self.select_action_from_menu(name),
             )
         self.menu.add_separator()
@@ -493,15 +523,29 @@ class DesktopPet:
 
     def animate(self) -> None:
         frames = self.load_frames(self.action)
-        self.canvas.itemconfigure(self.pet_item, image=frames[self.frame_index])
-        self.frame_index = (self.frame_index + 1) % len(frames)
+        current_frame = min(self.frame_index, len(frames) - 1)
+        self.canvas.itemconfigure(self.pet_item, image=frames[current_frame])
         delay = int(self.actions[self.action]["frame_duration_ms"])
+        if self.action in ONE_SHOT_ACTIONS and current_frame >= len(frames) - 1:
+            self.root.after(delay, self.finish_one_shot_action)
+            return
+        self.frame_index = (current_frame + 1) % len(frames)
         self.root.after(delay, self.animate)
 
-    def show_status(self, text: str, duration_ms: int = STATUS_SHOW_MS) -> None:
+    def finish_one_shot_action(self) -> None:
+        if self.action in ONE_SHOT_ACTIONS:
+            self.double_click_until = 0
+            self.action_lock_until = 0
+            self.manual_override_until = 0
+            self.set_action("idle")
+        self.animate()
+
+    def show_status(self, text: str, duration_ms: int = STATUS_SHOW_MS, protect_ms: int = 0) -> None:
         self.last_state_label = text
         self.status_text_value = text
         self.status_until = self.now_ms() + duration_ms
+        if protect_ms:
+            self.status_protect_until = max(self.status_protect_until, self.now_ms() + protect_ms)
         cache_key = (text, self.scale)
         if cache_key not in self.status_cache:
             self.status_cache[cache_key] = ImageTk.PhotoImage(self.render_status_bubble(text))
@@ -512,6 +556,7 @@ class DesktopPet:
     def clear_status_if_needed(self) -> None:
         if self.status_until and self.now_ms() >= self.status_until:
             self.status_until = 0
+            self.status_protect_until = 0
             self.last_state_label = ""
             self.status_text_value = ""
             self.canvas.itemconfigure(self.status_item, image="")
@@ -547,6 +592,46 @@ class DesktopPet:
         self.canvas.coords(self.resource_item, panel_x, panel_y)
         self.canvas.tag_raise(self.resource_item)
 
+    def show_hit_effect(self, x: int, y: int) -> None:
+        for item in self.hit_effect_items:
+            self.canvas.delete(item)
+        size = max(12, round(15 * self.scale))
+        points = [
+            x,
+            y - size,
+            x + round(size * 0.28),
+            y - round(size * 0.30),
+            x + size,
+            y - round(size * 0.20),
+            x + round(size * 0.38),
+            y + round(size * 0.12),
+            x + round(size * 0.58),
+            y + size,
+            x,
+            y + round(size * 0.46),
+            x - round(size * 0.58),
+            y + size,
+            x - round(size * 0.38),
+            y + round(size * 0.12),
+            x - size,
+            y - round(size * 0.20),
+            x - round(size * 0.28),
+            y - round(size * 0.30),
+        ]
+        burst = self.canvas.create_polygon(points, fill="#ffd45a", outline="#3a2a1a", width=max(1, round(2 * self.scale)))
+        mark = self.canvas.create_text(x, y - round(size * 1.45), text="딱!", fill="#151515", font=("Malgun Gothic", max(10, round(12 * self.scale)), "bold"))
+        self.hit_effect_items = [burst, mark]
+        self.hit_effect_until = self.now_ms() + HIT_EFFECT_SHOW_MS
+        for item in self.hit_effect_items:
+            self.canvas.tag_raise(item)
+
+    def clear_hit_effect_if_needed(self) -> None:
+        if self.hit_effect_until and self.now_ms() >= self.hit_effect_until:
+            self.hit_effect_until = 0
+            for item in self.hit_effect_items:
+                self.canvas.delete(item)
+            self.hit_effect_items = []
+
     def update_sparkles(self) -> None:
         canvas_width = int(self.canvas.cget("width"))
         pet_size = max(1, round(self.cell_size * self.scale))
@@ -565,12 +650,23 @@ class DesktopPet:
         self.canvas.tag_raise(self.sparkle_items[1])
         self.canvas.tag_raise(self.sparkle_items[2])
 
-    def set_action(self, action_name: str, label: str | None = None, manual: bool = False, hold_ms: int = MANUAL_OVERRIDE_MS) -> None:
-        if self.action != action_name:
+    def set_action(
+        self,
+        action_name: str,
+        label: str | None = None,
+        manual: bool = False,
+        hold_ms: int = MANUAL_OVERRIDE_MS,
+        protect_label_ms: int = 0,
+        force_label: bool = False,
+    ) -> None:
+        action_changed = self.action != action_name
+        if action_changed:
             self.action = action_name
             self.frame_index = 0
-        if label and (label != self.last_state_label or self.now_ms() >= self.status_until):
-            self.show_status(label)
+        status_expired = self.now_ms() >= self.status_until
+        if label and (force_label or action_changed or label == self.last_state_label or status_expired):
+            if force_label or label == self.last_state_label or self.now_ms() >= self.status_protect_until:
+                self.show_status(label, protect_ms=protect_label_ms)
         if manual:
             self.manual_override_until = self.now_ms() + hold_ms
 
@@ -581,7 +677,7 @@ class DesktopPet:
         self.action_lock_until = self.now_ms() + MENU_ACTION_LOCK_MS
         self.set_action(
             action_name,
-            label=ACTION_LABELS.get(action_name, action_name),
+            label=action_label(action_name),
             manual=True,
             hold_ms=MENU_ACTION_LOCK_MS,
         )
@@ -701,7 +797,7 @@ class DesktopPet:
                 ("agi_box", 1),
             ]
         )
-        return action, ACTION_LABELS.get(action, "한가함")
+        return action, action_label(action, "한가함")
 
     def schedule_smart_update(self, initial: bool = False) -> None:
         if self.smart_job:
@@ -746,7 +842,13 @@ class DesktopPet:
         left, top, right, bottom = self.get_screen_bounds()
         width = int(self.canvas.cget("width"))
         height = int(self.canvas.cget("height"))
-        return max(left, min(right - width, x)), max(top, min(bottom - height, y))
+        visible_x = min(width, max(EDGE_KEEP_VISIBLE_PX, round(EDGE_KEEP_VISIBLE_PX * self.scale)))
+        visible_y = min(height, max(EDGE_KEEP_VISIBLE_PX, round(EDGE_KEEP_VISIBLE_PX * self.scale)))
+        min_x = left - width + visible_x
+        max_x = right - visible_x
+        min_y = top - height + visible_y
+        max_y = bottom - visible_y
+        return max(min_x, min(max_x, x)), max(min_y, min(max_y, y))
 
     def set_window_position(self, x: int, y: int) -> None:
         x, y = self.clamp_window_position(x, y)
@@ -761,18 +863,18 @@ class DesktopPet:
             SWP_NOSIZE | SWP_NOACTIVATE,
         )
         if not moved:
-            self.root.geometry(f"{x:+d}{y:+d}")
+            if x >= 0 and y >= 0:
+                self.root.geometry(f"+{x:d}+{y:d}")
 
     def maybe_start_wander(self) -> None:
         if self.wander_target_x is not None or self.is_hovering or self.now_ms() < self.manual_override_until:
             return
         if random.random() > 0.01:
             return
-        left, _, right, _ = self.get_screen_bounds()
-        width = int(self.canvas.cget("width"))
         current_x = self.root.winfo_x()
         shift = random.randint(90, 240) * random.choice([-1, 1])
-        self.wander_target_x = max(left, min(right - width, current_x + shift))
+        target_x, _ = self.clamp_window_position(current_x + shift, self.root.winfo_y())
+        self.wander_target_x = target_x
 
     def apply_mouse_follow(self) -> bool:
         if self.is_dragging or self.now_ms() < self.tickle_until or self.now_ms() < self.pointer_reaction_pause_until:
@@ -835,7 +937,7 @@ class DesktopPet:
         self.wander_target_x = None
         self.system_typing_active = True
         self.post_typing_idle_until = 0
-        self.set_action("typing", label=ACTION_LABELS["typing"])
+        self.set_action("typing", label=action_label("typing"))
         return True
 
     def apply_post_typing_idle(self) -> bool:
@@ -848,7 +950,7 @@ class DesktopPet:
         self.post_typing_idle_until = 0
         action, label = self.choose_action_for_state(self.get_pc_state())
         if action == "typing":
-            action, label = "think", ACTION_LABELS["think"]
+            action, label = "think", action_label("think")
         self.set_action(action, label=label)
         return True
 
@@ -862,11 +964,12 @@ class DesktopPet:
         self.update_sparkles()
         self.redraw_status()
         self.clear_status_if_needed()
+        self.clear_hit_effect_if_needed()
         self.update_keyboard_activity()
         if self.is_dragging:
-            self.set_action("drag_dangle", label=ACTION_LABELS["drag_dangle"], manual=True, hold_ms=DRAG_HOLD_REFRESH_MS)
+            self.set_action("drag_dangle", label=action_label("drag_dangle"), manual=True, hold_ms=DRAG_HOLD_REFRESH_MS)
         elif self.now_ms() < self.tickle_until:
-            self.set_action("scroll_tickle", label=ACTION_LABELS["scroll_tickle"], manual=True, hold_ms=TICKLE_STOP_MS + 300)
+            self.set_action("scroll_tickle", label=action_label("scroll_tickle"), manual=True, hold_ms=TICKLE_STOP_MS + 300)
         if self.is_action_locked():
             self.schedule_behavior_tick()
             return
@@ -885,26 +988,63 @@ class DesktopPet:
     def start_drag(self, event: tk.Event[tk.Misc]) -> None:
         if self.is_action_locked():
             return
+        if self.now_ms() < self.double_click_until:
+            return
         self.drag_offset = (event.x_root - self.root.winfo_x(), event.y_root - self.root.winfo_y())
         self.wander_target_x = None
         self.drag_moved = False
         self.is_dragging = True
         self.drag_started_at = self.now_ms()
-        self.set_action("drag_dangle", label=ACTION_LABELS["drag_dangle"], manual=True, hold_ms=HOVER_OVERRIDE_MS)
+        self.set_action(
+            "drag_dangle",
+            label=action_label("drag_dangle"),
+            manual=True,
+            hold_ms=HOVER_OVERRIDE_MS,
+            force_label=True,
+        )
+
+    def on_double_click(self, event: tk.Event[tk.Misc]) -> None:
+        if self.is_action_locked() and self.action not in ONE_SHOT_ACTIONS:
+            return
+        self.is_dragging = False
+        self.drag_moved = False
+        self.drag_started_at = 0
+        self.wander_target_x = None
+        self.frame_index = 0
+        now = self.now_ms()
+        self.double_click_until = now + DOUBLE_CLICK_HIT_HOLD_MS
+        self.pointer_reaction_pause_until = now + DOUBLE_CLICK_HIT_HOLD_MS
+        self.action_lock_until = now + DOUBLE_CLICK_HIT_HOLD_MS
+        self.show_hit_effect(event.x, event.y)
+        self.set_action(
+            "bonk",
+            label=action_label("bonk"),
+            manual=True,
+            hold_ms=DOUBLE_CLICK_HIT_HOLD_MS,
+            protect_label_ms=REACTION_STATUS_PROTECT_MS,
+            force_label=True,
+        )
 
     def on_drag(self, event: tk.Event[tk.Misc]) -> None:
         if self.is_action_locked():
+            return
+        if self.now_ms() < self.double_click_until:
             return
         self.is_dragging = True
         x = event.x_root - self.drag_offset[0]
         y = event.y_root - self.drag_offset[1]
         if abs(x - self.root.winfo_x()) > 2 or abs(y - self.root.winfo_y()) > 2:
             self.drag_moved = True
-        self.set_action("drag_dangle", label=ACTION_LABELS["drag_dangle"], manual=True, hold_ms=HOVER_OVERRIDE_MS)
+        self.set_action("drag_dangle", label=action_label("drag_dangle"), manual=True, hold_ms=HOVER_OVERRIDE_MS)
         self.set_window_position(x, y)
 
     def on_click_release(self, event: tk.Event[tk.Misc]) -> None:
         if self.is_action_locked():
+            return
+        if self.now_ms() < self.double_click_until:
+            self.is_dragging = False
+            self.drag_moved = False
+            self.drag_started_at = 0
             return
         held_ms = self.now_ms() - self.drag_started_at if self.drag_started_at else 0
         was_dragging = self.is_dragging
@@ -912,7 +1052,13 @@ class DesktopPet:
         self.drag_started_at = 0
         if self.drag_moved or (was_dragging and held_ms > 250):
             self.drag_moved = False
-            self.set_action(random.choice(["surprise", "wave", "idle"]), label="살았다", manual=True, hold_ms=3000)
+            self.set_action(
+                random.choice(["surprise", "wave", "idle"]),
+                label="살았다",
+                manual=True,
+                hold_ms=3000,
+                protect_label_ms=REACTION_STATUS_PROTECT_MS,
+            )
             return
         if 0 <= event.x <= self.canvas.winfo_width() and 0 <= event.y <= self.canvas.winfo_height():
             self.wander_target_x = None
@@ -920,7 +1066,7 @@ class DesktopPet:
             action_name = random.choice(["wave", "cheer", "surprise", "half_right", "welcome_agi"])
             self.set_action(
                 action_name,
-                label=ACTION_LABELS[action_name],
+                label=action_label(action_name),
                 manual=True,
                 hold_ms=CLICK_REACTION_HOLD_MS,
             )
@@ -930,7 +1076,7 @@ class DesktopPet:
             return
         self.wander_target_x = None
         self.tickle_until = self.now_ms() + TICKLE_STOP_MS
-        self.set_action("scroll_tickle", label=ACTION_LABELS["scroll_tickle"], manual=True, hold_ms=TICKLE_STOP_MS + 300)
+        self.set_action("scroll_tickle", label=action_label("scroll_tickle"), manual=True, hold_ms=TICKLE_STOP_MS + 300)
 
     def on_hover_enter(self, _event: tk.Event[tk.Misc]) -> None:
         if self.is_action_locked():

@@ -218,6 +218,20 @@
         "assets/generated/frames/scroll_tickle/07.png"
       ],
       "frame_duration_ms": 180
+    },
+    "bonk": {
+      "display_name": "Bonk",
+      "frames": [
+        "assets/generated/frames/bonk/00.png",
+        "assets/generated/frames/bonk/01.png",
+        "assets/generated/frames/bonk/02.png",
+        "assets/generated/frames/bonk/03.png",
+        "assets/generated/frames/bonk/04.png",
+        "assets/generated/frames/bonk/05.png",
+        "assets/generated/frames/bonk/06.png",
+        "assets/generated/frames/bonk/07.png"
+      ],
+      "frame_duration_ms": 180
     }
   }
 }
