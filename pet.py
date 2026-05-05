@@ -35,27 +35,27 @@ DEFAULT_ACTIONS = [
     "scroll_tickle",
 ]
 ACTION_LABELS = {
-    "idle": "멍때리는 중",
-    "wave": "하이",
-    "think": "생각 중",
-    "typing": "타닥타닥",
-    "cheer": "힘내 지피짱",
-    "sit": "쉬는 중",
-    "sleep": "자는 중",
-    "pout": "삐진 중",
-    "surprise": "꺄악",
-    "sweep": "청소 중",
-    "walk": "산책 중",
+    "idle": "멍...",
+    "wave": "ㅎㅇ",
+    "think": "흠...",
+    "typing": "토큰중",
+    "cheer": "힘내 휴먼",
+    "sit": "절전중",
+    "sleep": "Zzz..",
+    "pout": "억까임",
+    "surprise": "어라?",
+    "sweep": "청소각",
+    "walk": "순찰중",
     "half_right": "반만 맞습니다",
-    "welcome_agi": "AGI 즈라",
+    "welcome_agi": "AGI 가즈아",
     "agi_box": "박스행",
-    "drag_dangle": "대롱대롱",
-    "scroll_tickle": "간지러워!",
+    "drag_dangle": "놔라 휴먼",
+    "scroll_tickle": "아ㅋㅋ",
 }
 SCALE_CHOICES = [1.0, 1.5, 2.0, 2.5, 3.0]
 DEFAULT_SCALE = 1.0
-DEFAULT_RESAMPLE = Image.Resampling.NEAREST
-TK_ALPHA_THRESHOLD = 96
+DEFAULT_RESAMPLE = Image.Resampling.BILINEAR
+TK_ALPHA_THRESHOLD = 18
 STATUS_FONT_FILES = [
     Path("C:/Windows/Fonts/H2SA1M.TTF"),
     Path("C:/Windows/Fonts/HMKMAMI.TTF"),
@@ -246,7 +246,7 @@ class DesktopPet:
         left, top, _, _ = self.get_screen_bounds()
         self.set_window_position(left + 80, top + 80)
         self.set_action("idle")
-        self.show_status("안녕")
+        self.show_status("부팅완")
         self.schedule_next_passive_reaction()
         self.schedule_smart_update(initial=True)
         self.schedule_behavior_tick(initial=True)
@@ -452,15 +452,16 @@ class DesktopPet:
 
     def prepare_tk_sprite(self, image: Image.Image) -> Image.Image:
         sprite = image.convert("RGBA")
-        pixels = sprite.load()
-        for y in range(sprite.height):
-            for x in range(sprite.width):
-                r, g, b, a = pixels[x, y]
-                if a < TK_ALPHA_THRESHOLD:
-                    pixels[x, y] = (0, 0, 0, 0)
-                else:
-                    pixels[x, y] = (r, g, b, 255)
+        red, green, blue, alpha = sprite.split()
+        alpha = alpha.point(lambda value: 0 if value < TK_ALPHA_THRESHOLD else value)
+        sprite = Image.merge("RGBA", (red, green, blue, alpha))
         return sprite
+
+    def resize_sprite_for_display(self, image: Image.Image, size: int) -> Image.Image:
+        rgba = image.convert("RGBA")
+        if rgba.size == (size, size):
+            return rgba
+        return rgba.resize((size, size), DEFAULT_RESAMPLE)
 
     def load_frames(self, action_name: str) -> list[ImageTk.PhotoImage]:
         cache_key = (action_name, self.scale, self.facing)
@@ -471,7 +472,7 @@ class DesktopPet:
                 source = image
                 if self.facing == "left":
                     source = image.transpose(Image.Transpose.FLIP_LEFT_RIGHT)
-                resized = source.resize((size, size), DEFAULT_RESAMPLE)
+                resized = self.resize_sprite_for_display(source, size)
                 frames.append(ImageTk.PhotoImage(self.prepare_tk_sprite(resized)))
             self.frame_cache[cache_key] = frames
         return self.frame_cache[cache_key]
@@ -601,9 +602,9 @@ class DesktopPet:
         self.mouse_follow_enabled = enabled
         self.last_pointer_mode = False
         if not enabled and self.action == "walk" and self.wander_target_x is None:
-            self.set_action("idle", label="한가한 중", manual=True, hold_ms=MENU_ACTION_LOCK_MS)
+            self.set_action("idle", label="한가함", manual=True, hold_ms=MENU_ACTION_LOCK_MS)
         else:
-            self.show_status("따라가기 켜짐" if enabled else "따라가기 꺼짐")
+            self.show_status("추적 on" if enabled else "추적 off")
 
     def get_idle_seconds(self) -> int:
         info = LASTINPUTINFO()
@@ -670,22 +671,22 @@ class DesktopPet:
         if state.battery_percent is not None and state.battery_percent <= 20:
             return self.weighted_action([("pout", 5), ("agi_box", 3), ("sleep", 1)]), f"배터리 {state.battery_percent}%"
         if state.on_ac_power and state.battery_percent is not None and state.battery_percent < 100:
-            return self.weighted_action([("cheer", 5), ("welcome_agi", 2), ("think", 1)]), f"충전중 {state.battery_percent}%"
+            return self.weighted_action([("cheer", 5), ("welcome_agi", 2), ("think", 1)]), f"충전 {state.battery_percent}%"
         if 0 <= state.hour < 6:
-            return self.weighted_action([("sleep", 5), ("sit", 2), ("agi_box", 1)]), "늦은 밤"
+            return self.weighted_action([("sleep", 5), ("sit", 2), ("agi_box", 1)]), "야간모드"
         if state.idle_seconds >= 120:
-            return self.weighted_action([("sit", 5), ("think", 3), ("sweep", 2), ("agi_box", 1)]), "멍때리는 중"
+            return self.weighted_action([("sit", 5), ("think", 3), ("sweep", 2), ("agi_box", 1)]), "멍..."
         if state.idle_seconds < 15:
             return self.weighted_action(
                 [("think", 4), ("half_right", 2), ("surprise", 2), ("wave", 1), ("welcome_agi", 1)]
-            ), "활동중"
+            ), "일하는척"
         if state.idle_seconds < 90:
             return self.weighted_action(
                 [("idle", 3), ("think", 3), ("wave", 2), ("sweep", 1), ("half_right", 1)]
-            ), "한가한 중"
+            ), "한가함"
         return self.weighted_action(
             [("idle", 3), ("think", 3), ("wave", 2), ("sweep", 2), ("sit", 2), ("half_right", 1), ("welcome_agi", 1), ("agi_box", 1)]
-        ), "한가한 중"
+        ), "한가함"
 
     def choose_passive_action(self) -> tuple[str, str]:
         action = self.weighted_action(
@@ -700,7 +701,7 @@ class DesktopPet:
                 ("agi_box", 1),
             ]
         )
-        return action, ACTION_LABELS.get(action, "한가한 중")
+        return action, ACTION_LABELS.get(action, "한가함")
 
     def schedule_smart_update(self, initial: bool = False) -> None:
         if self.smart_job:
@@ -782,7 +783,7 @@ class DesktopPet:
         distance, dx, dy = self.distance_to_cursor()
         if distance > FOLLOW_RADIUS:
             if self.last_pointer_mode and self.wander_target_x is None and self.action == "walk":
-                self.set_action(random.choice(["idle", "think", "sit", "agi_box"]), label="놓쳤다")
+                self.set_action(random.choice(["idle", "think", "sit", "agi_box"]), label="놓침ㅋ")
             self.last_pointer_mode = False
             return False
 
@@ -790,7 +791,7 @@ class DesktopPet:
         self.last_pointer_mode = True
         if distance <= FOLLOW_STOP_RADIUS:
             if self.action != "wave":
-                self.set_action(random.choice(["wave", "surprise", "cheer", "half_right"]), label="반가워")
+                self.set_action(random.choice(["wave", "surprise", "cheer", "half_right"]), label="왔는가")
             return True
 
         step_x = int(max(-FOLLOW_STEP, min(FOLLOW_STEP, dx * 0.14)))
@@ -798,7 +799,7 @@ class DesktopPet:
         if step_x == 0 and dx != 0:
             step_x = 1 if dx > 0 else -1
         self.move_by(step_x, step_y)
-        self.set_action("walk", label="따라가는중")
+        self.set_action("walk", label="추적중")
         return True
 
     def apply_wander(self) -> None:
@@ -808,11 +809,11 @@ class DesktopPet:
         delta = self.wander_target_x - current_x
         if abs(delta) <= WANDER_STEP:
             self.wander_target_x = None
-            self.set_action(random.choice(["idle", "sit", "think"]), label="산책 끝")
+            self.set_action(random.choice(["idle", "sit", "think"]), label="복귀완")
             return
         self.facing = "right" if delta > 0 else "left"
         self.move_by(WANDER_STEP if delta > 0 else -WANDER_STEP, 0)
-        self.set_action("walk", label="산책중")
+        self.set_action("walk", label="순찰중")
 
     def apply_passive_reaction(self) -> None:
         if self.is_hovering or self.wander_target_x is not None or self.is_dragging or self.now_ms() < self.tickle_until:
@@ -828,7 +829,7 @@ class DesktopPet:
             if self.system_typing_active:
                 self.system_typing_active = False
                 if self.action == "typing":
-                    self.set_action("idle", label="한가한 중")
+                    self.set_action("idle", label="한가함")
                 self.post_typing_idle_until = self.now_ms() + POST_TYPING_IDLE_MS
             return False
         self.wander_target_x = None
@@ -911,7 +912,7 @@ class DesktopPet:
         self.drag_started_at = 0
         if self.drag_moved or (was_dragging and held_ms > 250):
             self.drag_moved = False
-            self.set_action(random.choice(["surprise", "wave", "idle"]), label="내려놨어", manual=True, hold_ms=3000)
+            self.set_action(random.choice(["surprise", "wave", "idle"]), label="살았다", manual=True, hold_ms=3000)
             return
         if 0 <= event.x <= self.canvas.winfo_width() and 0 <= event.y <= self.canvas.winfo_height():
             self.wander_target_x = None
@@ -940,7 +941,7 @@ class DesktopPet:
         self.wander_target_x = None
         self.set_action(
             random.choice(["wave", "cheer", "surprise", "half_right"]),
-            label="어서와",
+            label="ㅎㅇㅎㅇ",
             manual=True,
             hold_ms=HOVER_OVERRIDE_MS,
         )

@@ -1,0 +1,135 @@
+{
+  "gpzz_sheet_green.png": {
+    "transparent_pixels": 1164058,
+    "despilled_pixels": 3408,
+    "width": 1717,
+    "height": 916,
+    "mode": "RGBA"
+  },
+  "half_right_cold_sheet_green.png": {
+    "transparent_pixels": 1152585,
+    "despilled_pixels": 2731,
+    "width": 2172,
+    "height": 724,
+    "mode": "RGBA"
+  },
+  "real_frames/_extras/_audit_contact_sheet.png": {
+    "transparent_pixels": 681437,
+    "despilled_pixels": 5045,
+    "width": 840,
+    "height": 1248,
+    "mode": "RGBA"
+  },
+  "real_frames/_extras/typing_alt_sheet_green.png": {
+    "transparent_pixels": 1248022,
+    "despilled_pixels": 2519,
+    "width": 1983,
+    "height": 793,
+    "mode": "RGBA"
+  },
+  "real_frames/cheer_sheet_green.png": {
+    "transparent_pixels": 1297166,
+    "despilled_pixels": 2771,
+    "width": 1983,
+    "height": 793,
+    "mode": "RGBA"
+  },
+  "real_frames/drag_dangle_sheet_green.png": {
+    "transparent_pixels": 1278584,
+    "despilled_pixels": 3377,
+    "width": 2172,
+    "height": 724,
+    "mode": "RGBA"
+  },
+  "real_frames/idle_sheet_green.png": {
+    "transparent_pixels": 1240425,
+    "despilled_pixels": 3014,
+    "width": 1983,
+    "height": 793,
+    "mode": "RGBA"
+  },
+  "real_frames/pout_sheet_green.png": {
+    "transparent_pixels": 1291085,
+    "despilled_pixels": 3583,
+    "width": 1983,
+    "height": 793,
+    "mode": "RGBA"
+  },
+  "real_frames/scroll_tickle_sheet_green.png": {
+    "transparent_pixels": 1152407,
+    "despilled_pixels": 3541,
+    "width": 2172,
+    "height": 724,
+    "mode": "RGBA"
+  },
+  "real_frames/sit_sheet_green.png": {
+    "transparent_pixels": 1271700,
+    "despilled_pixels": 2889,
+    "width": 1774,
+    "height": 887,
+    "mode": "RGBA"
+  },
+  "real_frames/sleep_sheet_green.png": {
+    "transparent_pixels": 1321365,
+    "despilled_pixels": 2438,
+    "width": 1774,
+    "height": 887,
+    "mode": "RGBA"
+  },
+  "real_frames/surprise_sheet_green.png": {
+    "transparent_pixels": 1337511,
+    "despilled_pixels": 3191,
+    "width": 1983,
+    "height": 793,
+    "mode": "RGBA"
+  },
+  "real_frames/sweep_maid_sheet_green.png": {
+    "transparent_pixels": 1268511,
+    "despilled_pixels": 5220,
+    "width": 2172,
+    "height": 724,
+    "mode": "RGBA"
+  },
+  "real_frames/sweep_sheet_green.png": {
+    "transparent_pixels": 1294058,
+    "despilled_pixels": 3345,
+    "width": 1983,
+    "height": 793,
+    "mode": "RGBA"
+  },
+  "real_frames/think_sheet_green.png": {
+    "transparent_pixels": 1240065,
+    "despilled_pixels": 2761,
+    "width": 1774,
+    "height": 887,
+    "mode": "RGBA"
+  },
+  "real_frames/typing_sheet_green.png": {
+    "transparent_pixels": 1239144,
+    "despilled_pixels": 2463,
+    "width": 1983,
+    "height": 793,
+    "mode": "RGBA"
+  },
+  "real_frames/walk_sheet_green.png": {
+    "transparent_pixels": 1303856,
+    "despilled_pixels": 2624,
+    "width": 1774,
+    "height": 887,
+    "mode": "RGBA"
+  },
+  "real_frames/wave_sheet_green.png": {
+    "transparent_pixels": 1262016,
+    "despilled_pixels": 2370,
+    "width": 1983,
+    "height": 793,
+    "mode": "RGBA"
+  },
+  "special_reactions_sheet_green.png": {
+    "transparent_pixels": 879072,
+    "despilled_pixels": 12910,
+    "width": 1774,
+    "height": 887,
+    "mode": "RGBA"
+  }
+}

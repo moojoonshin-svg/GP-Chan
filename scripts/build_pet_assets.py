@@ -9,14 +9,15 @@ from PIL import Image, ImageDraw, ImageFilter, ImageFont
 
 
 ROOT = Path(__file__).resolve().parents[1]
-SOURCE = ROOT / "assets" / "source" / "gpzz_sheet_green.png"
-SPECIAL_SOURCE = ROOT / "assets" / "source" / "special_reactions_sheet_green.png"
-HALF_RIGHT_SOURCE = ROOT / "assets" / "source" / "half_right_cold_sheet_green.png"
+SOURCE_ROOT = ROOT / "assets" / "source_mastered"
+SOURCE = SOURCE_ROOT / "gpzz_sheet_green.png"
+SPECIAL_SOURCE = SOURCE_ROOT / "special_reactions_sheet_green.png"
+HALF_RIGHT_SOURCE = SOURCE_ROOT / "half_right_cold_sheet_green.png"
 OUTPUT = ROOT / "assets" / "generated"
 FRAMES_DIR = OUTPUT / "frames"
 SPRITE_SHEET = OUTPUT / "sprite_sheet.png"
 MANIFEST = OUTPUT / "manifest.json"
-REAL_SHEETS_DIR = ROOT / "assets" / "source" / "real_frames"
+REAL_SHEETS_DIR = SOURCE_ROOT / "real_frames"
 CELL_SIZE = 160
 GRID_COLS = 5
 GRID_ROWS = 2
@@ -78,6 +79,8 @@ FONT_FILES = [
     Path("C:/Windows/Fonts/HMKMAMI.TTF"),
     Path("C:/Windows/Fonts/malgunbd.ttf"),
 ]
+ILLUSTRATION_RESAMPLE = Image.Resampling.LANCZOS
+ILLUSTRATION_ROTATE_RESAMPLE = Image.Resampling.BICUBIC
 
 
 @dataclass(frozen=True)
@@ -172,28 +175,6 @@ MOTIONS: dict[str, PoseMotion] = {
         shadow=(1.0,) * 8,
     ),
 }
-
-
-def remove_green(image: Image.Image) -> Image.Image:
-    rgba = image.convert("RGBA")
-    out = Image.new("RGBA", rgba.size)
-    src = rgba.load()
-    dst = out.load()
-    for y in range(rgba.height):
-        for x in range(rgba.width):
-            r, g, b, _ = src[x, y]
-            green_excess = g - max(r, b)
-            if g > 160 and green_excess > 20:
-                alpha = int(max(0, min(255, 255 - (green_excess * 1.7))))
-                if alpha < 10:
-                    dst[x, y] = (0, 0, 0, 0)
-                    continue
-                # Despill remaining edge pixels so green fringing does not survive scaling.
-                safe_green = min(g, max(r, b) + 10)
-                dst[x, y] = (r, safe_green, b, alpha)
-            else:
-                dst[x, y] = (r, g, b, 255)
-    return out
 
 
 def resize_rgba_premultiplied(image: Image.Image, size: tuple[int, int], resample: Image.Resampling) -> Image.Image:
@@ -316,7 +297,7 @@ def fit_pose(image: Image.Image, max_size: int = 136) -> Image.Image:
     resized = resize_rgba_premultiplied(
         pose,
         (max(1, round(pose.width * scale)), max(1, round(pose.height * scale))),
-        Image.Resampling.LANCZOS,
+        ILLUSTRATION_RESAMPLE,
     )
     return resized
 
@@ -328,7 +309,7 @@ def fit_special_frame(image: Image.Image, max_size: int = 152) -> Image.Image:
     return resize_rgba_premultiplied(
         pose,
         (max(1, round(pose.width * scale)), max(1, round(pose.height * scale))),
-        Image.Resampling.LANCZOS,
+        ILLUSTRATION_RESAMPLE,
     )
 
 
@@ -345,6 +326,25 @@ def harden_alpha(image: Image.Image, threshold: int = HARD_ALPHA_THRESHOLD) -> I
             else:
                 pixels[x, y] = (r, g, b, 255)
     return rgba
+
+
+def despill_green_edges(image: Image.Image) -> Image.Image:
+    rgba = image.convert("RGBA")
+    pixels = rgba.load()
+    for y in range(rgba.height):
+        for x in range(rgba.width):
+            r, g, b, a = pixels[x, y]
+            if a and (
+                (g > 55 and g > r + 4 and g > b + 4)
+                or (a < 160 and g > r + 3 and g > b + 3)
+                or (g < 90 and r < 80 and b < 80 and g > r + 3 and g > b + 3)
+            ):
+                pixels[x, y] = (r, min(g, max(r, b) + 2), b, a)
+    return rgba
+
+
+def finalize_frame(image: Image.Image, threshold: int = HARD_ALPHA_THRESHOLD) -> Image.Image:
+    return despill_green_edges(harden_alpha(image, threshold=threshold))
 
 
 def get_font(size: int) -> ImageFont.FreeTypeFont | ImageFont.ImageFont:
@@ -405,10 +405,10 @@ def render_frame(base: Image.Image, motion: PoseMotion, frame_index: int) -> Ima
             max(1, round(base.width * scale_x)),
             max(1, round(base.height * scale_y)),
         ),
-        Image.Resampling.LANCZOS,
+        ILLUSTRATION_RESAMPLE,
     ).rotate(
         motion.rotation[frame_index],
-        resample=Image.Resampling.BICUBIC,
+        resample=ILLUSTRATION_ROTATE_RESAMPLE,
         expand=True,
     )
 
@@ -420,7 +420,7 @@ def render_frame(base: Image.Image, motion: PoseMotion, frame_index: int) -> Ima
     x = (CELL_SIZE - transformed.width) // 2 + motion.x[frame_index]
     y = CELL_SIZE - transformed.height - 6 + motion.y[frame_index]
     frame.alpha_composite(transformed, (x, y))
-    return harden_alpha(frame)
+    return finalize_frame(frame)
 
 
 def slice_cells(sheet: Image.Image) -> list[Image.Image]:
@@ -449,7 +449,7 @@ def slice_horizontal_frames(sheet: Image.Image, frame_count: int = 8) -> list[Im
 
 def build_real_frames(action: str, action_dir: Path) -> list[Path]:
     real_sheet_path = REAL_SHEETS_DIR / REAL_FRAME_ACTIONS[action]
-    sheet = remove_green(Image.open(real_sheet_path))
+    sheet = Image.open(real_sheet_path).convert("RGBA")
     raw_frames = slice_horizontal_frames(sheet, frame_count=8)
     if action == "walk":
         raw_frames = raw_frames[:-1]
@@ -472,7 +472,7 @@ def build_real_frames(action: str, action_dir: Path) -> list[Path]:
         x = (CELL_SIZE - pose.width) // 2
         y = CELL_SIZE - pose.height - 6
         frame.alpha_composite(pose, (x, y))
-        frame = harden_alpha(frame)
+        frame = finalize_frame(frame)
         frame_path = action_dir / f"{frame_index:02}.png"
         frame.save(frame_path)
         frame_paths.append(frame_path)
@@ -540,7 +540,7 @@ def draw_agi_box_frame(frame: Image.Image, frame_index: int) -> Image.Image:
     draw_centered_text(draw, (5, 2, 62, 33), "키워", get_font(22), (18, 18, 22, 255), 1, (255, 255, 255, 255))
     bbox = alpha_bbox(frame)
     character = frame.crop(bbox)
-    character = resize_rgba_premultiplied(character, (round(character.width * 0.67), round(character.height * 0.67)), Image.Resampling.LANCZOS)
+    character = resize_rgba_premultiplied(character, (round(character.width * 0.67), round(character.height * 0.67)), ILLUSTRATION_RESAMPLE)
     x = (CELL_SIZE - character.width) // 2
     y = 52 + (frame_index % 2)
     canvas.alpha_composite(character, (x, y))
@@ -580,11 +580,11 @@ def stabilize_half_right_frames(frames: list[Image.Image]) -> list[Image.Image]:
 
 def build_special_frames(action: str, action_dir: Path) -> list[Path]:
     if action == "half_right" and HALF_RIGHT_SOURCE.exists():
-        sheet = remove_green(Image.open(HALF_RIGHT_SOURCE))
+        sheet = Image.open(HALF_RIGHT_SOURCE).convert("RGBA")
         row = 0
         row_count = 1
     elif SPECIAL_SOURCE.exists():
-        sheet = remove_green(Image.open(SPECIAL_SOURCE))
+        sheet = Image.open(SPECIAL_SOURCE).convert("RGBA")
         row = SPECIAL_SHEET_ROWS[action]
         row_count = len(SPECIAL_SHEET_ROWS)
     else:
@@ -617,7 +617,7 @@ def build_special_frames(action: str, action_dir: Path) -> list[Path]:
             clean = Image.new("RGBA", frame.size, (0, 0, 0, 0))
             clean.alpha_composite(frame.crop((30, 0, CELL_SIZE, CELL_SIZE)), (30, 0))
             frame = clean
-        frame = harden_alpha(frame, threshold=64)
+        frame = finalize_frame(frame, threshold=64)
         rendered_frames.append(frame)
 
     frame_paths: list[Path] = []
@@ -642,9 +642,13 @@ def build_assets() -> None:
     FRAMES_DIR.mkdir(parents=True, exist_ok=True)
     REAL_SHEETS_DIR.mkdir(parents=True, exist_ok=True)
 
-    source = Image.open(SOURCE)
-    transparent_sheet = remove_green(source)
-    cells = slice_cells(transparent_sheet)
+    if not SOURCE.exists():
+        raise FileNotFoundError(
+            f"Missing mastered source assets: {SOURCE}. Run scripts/remove_green_and_despill.py and scripts/remaster_assets.py first."
+        )
+
+    clean_sheet = Image.open(SOURCE).convert("RGBA")
+    cells = slice_cells(clean_sheet)
 
     if len(cells) != len(SOURCE_ACTION_NAMES):
         raise ValueError(f"Expected {len(SOURCE_ACTION_NAMES)} cells, got {len(cells)}")
