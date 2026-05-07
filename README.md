@@ -133,3 +133,32 @@ python scripts/build_pet_assets.py
 ```bash
 python -m py_compile pet.py scripts/remove_green_and_despill.py scripts/remaster_assets.py scripts/clean_green_spill.py scripts/build_pet_assets.py
 ```
+
+## Fork Additions
+
+이 아래 항목들은 원본 저장소 설명에 섞지 않고, 이 포크에서 추가한 내용만 따로 정리한 섹션입니다.
+
+### Codex Integration
+
+- 실행 중인 사용자 프로필의 `.codex/state_*.sqlite`와 현재 프로젝트의 Codex 세션 JSONL을 읽기 전용으로 확인합니다.
+- 현재 프로젝트와 연결된 Codex 스레드가 있으면 CPU/RAM 패널 위에 `CODEX` 박스가 추가됩니다.
+- 패널에는 현재 세션 기준 `5시간 남은량`, `1주일 남은량`이 표시됩니다.
+- Codex가 응답 중이거나 답변 본문을 남기면 펫 말풍선에 짧게 표시합니다.
+- Codex가 설치되어 있지 않거나 현재 프로젝트와 연결된 스레드가 없으면 기존 CPU/RAM 패널만 표시됩니다.
+
+### 추가 메뉴 옵션
+
+- 오른쪽 클릭 > `Codex 표시`: 켜기 / 끄기 / 새로고침
+- 오른쪽 클릭 > `윈도우 시작시 실행`: 현재 사용자 기준 Windows 시작 프로그램에 등록/해제합니다.
+
+### EXE Build
+
+포크 버전은 단일 실행 파일로도 빌드할 수 있습니다.
+
+```bash
+python -m PyInstaller --noconfirm --clean --windowed --onefile --name GP-Chan --add-data "assets/generated;assets/generated" pet.py
+```
+
+빌드 결과물:
+
+- `dist/GP-Chan.exe`
