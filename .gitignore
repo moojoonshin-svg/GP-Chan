@@ -7,3 +7,8 @@ env/
 assets/source_clean/
 assets/source_raw_green/
 assets/source_mastered/_remaster_report.json
+
+# Fork build outputs
+build/
+dist/
+*.spec

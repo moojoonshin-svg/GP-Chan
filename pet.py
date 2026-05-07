@@ -1,10 +1,16 @@
 from __future__ import annotations
 
+import ast
 import ctypes
 import json
 import math
+import os
 import random
+import re
+import sqlite3
+import sys
 import tkinter as tk
+import winreg
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
@@ -13,8 +19,19 @@ from tkinter import Menu
 from PIL import Image, ImageDraw, ImageFont, ImageTk
 
 
-ROOT = Path(__file__).resolve().parent
-MANIFEST_PATH = ROOT / "assets" / "generated" / "manifest.json"
+def bundle_root() -> Path:
+    return Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parent))
+
+
+def launch_root() -> Path:
+    if getattr(sys, "frozen", False):
+        return Path(sys.executable).resolve().parent
+    return Path(__file__).resolve().parent
+
+
+BUNDLE_ROOT = bundle_root()
+ROOT = launch_root()
+MANIFEST_PATH = BUNDLE_ROOT / "assets" / "generated" / "manifest.json"
 WINDOW_CHROMA = "#010203"
 DEFAULT_ACTIONS = [
     "idle",
@@ -86,6 +103,15 @@ STATUS_FONT_FILES = [
 ]
 SMART_UPDATE_MS = 20000;# 스마트 상태 판단 주기(ms). 20000 = 20초
 RESOURCE_UPDATE_MS = 10000;# CPU/RAM 게이지 갱신 주기(ms). 10000 = 10초
+###############################
+##### CODEX 연동 추가 시작 #####
+###############################
+CODEX_UPDATE_MS = 1200;# Codex 상태/사용량 갱신 주기(ms). 1200 = 1.2초
+CODEX_EVENT_SHOW_MS = 4600;# Codex 이벤트 말풍선 유지시간(ms)
+CODEX_ROLLOUT_TAIL_BYTES = 160000;# Codex 세션 JSONL 끝부분만 읽어 이벤트를 빠르게 확인
+###############################
+##### CODEX 연동 추가 끝   #####
+###############################
 BEHAVIOR_TICK_MS = 120;# 행동 루프 갱신 주기(ms). 낮을수록 반응 빠름
 TYPING_GAUGE_PER_KEY = 100;# 타이핑 키 1회당 차는 게이지
 TYPING_GAUGE_DECAY_PER_100MS = 10;# 0.1초마다 줄어드는 타이핑 게이지
@@ -120,6 +146,26 @@ SM_CYVIRTUALSCREEN = 79;# Windows 가상 데스크톱 전체 높이 상수
 HWND_TOPMOST = -1;# 창을 항상 위로 올릴 때 쓰는 Windows 상수
 SWP_NOSIZE = 0x0001;# 창 위치 변경 시 크기 유지 Windows 플래그
 SWP_NOACTIVATE = 0x0010;# 창 위치 변경 시 포커스 뺏지 않는 Windows 플래그
+ERROR_ALREADY_EXISTS = 183;# Windows CreateMutex 중복 실행 감지 상수
+SINGLE_INSTANCE_MUTEX_NAME = "GPChanDesktopPetSingleton";# 단일 실행용 전역 mutex 이름
+###############################
+##### Windows 자동실행 추가 시작 #####
+###############################
+STARTUP_RUN_KEY = r"Software\Microsoft\Windows\CurrentVersion\Run";# 현재 사용자 시작프로그램 레지스트리 경로
+STARTUP_VALUE_NAME = "GP-Chan";# 시작프로그램에 등록할 값 이름
+###############################
+##### Windows 자동실행 추가 끝   #####
+###############################
+
+
+def acquire_single_instance_mutex() -> ctypes.c_void_p:
+    handle = ctypes.windll.kernel32.CreateMutexW(None, False, SINGLE_INSTANCE_MUTEX_NAME)
+    if not handle:
+        raise OSError("Failed to create single-instance mutex")
+    if ctypes.windll.kernel32.GetLastError() == ERROR_ALREADY_EXISTS:
+        ctypes.windll.kernel32.CloseHandle(handle)
+        raise SystemExit
+    return handle
 
 
 class LASTINPUTINFO(ctypes.Structure):
@@ -167,6 +213,29 @@ class PCState:
     hour: int
 
 
+###############################
+##### CODEX 연동 추가 시작 #####
+###############################
+@dataclass
+class CodexState:
+    available: bool = False
+    thread_id: str = ""
+    title: str = ""
+    tokens_used: int = 0
+    plan_type: str = ""
+    primary_used_percent: float | None = None
+    secondary_used_percent: float | None = None
+    primary_resets_at: int | None = None
+    secondary_resets_at: int | None = None
+    updated_at_ms: int = 0
+    event_signature: str = ""
+    event_label: str = ""
+    event_entries: tuple[tuple[str, str], ...] = ()
+###############################
+##### CODEX 연동 추가 끝   #####
+###############################
+
+
 class DesktopPet:
     def __init__(self) -> None:
         manifest = json.loads(MANIFEST_PATH.read_text(encoding="utf-8"))
@@ -174,12 +243,27 @@ class DesktopPet:
         self.cell_size = int(manifest.get("cell_size", 80))
         self.frame_sources: dict[str, list[Image.Image]] = {}
         self.frame_cache: dict[tuple[str, float, str], list[ImageTk.PhotoImage]] = {}
-        self.status_cache: dict[tuple[str, float], ImageTk.PhotoImage] = {}
+        self.status_cache: dict[tuple[str, float, str], ImageTk.PhotoImage] = {}
         self.scale = DEFAULT_SCALE
         self.mouse_follow_enabled = True
         self.smart_job: str | None = None
         self.behavior_job: str | None = None
         self.resource_job: str | None = None
+        ###############################
+        ##### CODEX 연동 추가 시작 #####
+        ###############################
+        self.codex_job: str | None = None
+        self.codex_refresh_job: str | None = None
+        self.codex_event_job: str | None = None
+        self.codex_refresh_deadline_ms = 0
+        self.codex_panel_enabled = True
+        self.codex_seen_once = False
+        self.codex_last_event_signature = ""
+        self.codex_pending_events: list[tuple[str, str]] = []
+        self.codex_state = CodexState()
+        ###############################
+        ##### CODEX 연동 추가 끝   #####
+        ###############################
         self.manual_override_until = 0
         self.action_lock_until = 0
         self.status_until = 0
@@ -196,6 +280,15 @@ class DesktopPet:
         self.sparkle_phase = 0
         self.status_text_value = ""
         self.status_photo: ImageTk.PhotoImage | None = None
+        ###############################
+        ##### CODEX 연동 추가 시작 #####
+        ###############################
+        self.codex_status_text = ""
+        self.codex_status_until = 0
+        self.codex_status_photo: ImageTk.PhotoImage | None = None
+        ###############################
+        ##### CODEX 연동 추가 끝   #####
+        ###############################
         self.resource_photo: ImageTk.PhotoImage | None = None
         self.hit_effect_items: list[int] = []
         self.cpu_snapshot: tuple[int, int] | None = None
@@ -254,6 +347,13 @@ class DesktopPet:
         self.canvas.bind("<Enter>", self.on_hover_enter)
         self.canvas.bind("<Leave>", self.on_hover_leave)
 
+        ###############################
+        ##### Windows 자동실행 추가 시작 #####
+        ###############################
+        self.startup_enabled_var = tk.BooleanVar(master=self.root, value=self.is_startup_enabled())
+        ###############################
+        ##### Windows 자동실행 추가 끝   #####
+        ###############################
         self.menu = Menu(self.root, tearoff=0)
         for action_name in DEFAULT_ACTIONS:
             self.menu.add_command(
@@ -270,6 +370,32 @@ class DesktopPet:
         follow_menu.add_command(label="켜기", command=lambda: self.set_mouse_follow_enabled(True))
         follow_menu.add_command(label="끄기", command=lambda: self.set_mouse_follow_enabled(False))
         self.menu.add_cascade(label="마우스 따라가기", menu=follow_menu)
+        self.menu.add_separator()
+        ###############################
+        ##### CODEX 연동 추가 시작 #####
+        ###############################
+        codex_menu = Menu(self.menu, tearoff=0)
+        codex_menu.add_command(label="켜기", command=lambda: self.set_codex_panel_enabled(True))
+        codex_menu.add_command(label="끄기", command=lambda: self.set_codex_panel_enabled(False))
+        codex_menu.add_command(label="새로고침", command=self.force_codex_refresh)
+        self.menu.add_cascade(label="Codex 표시", menu=codex_menu)
+        self.menu.add_separator()
+        ###############################
+        ##### CODEX 연동 추가 끝   #####
+        ###############################
+        ###############################
+        ##### Windows 자동실행 추가 시작 #####
+        ###############################
+        self.menu.add_checkbutton(
+            label="윈도우 시작시 실행",
+            onvalue=True,
+            offvalue=False,
+            variable=self.startup_enabled_var,
+            command=self.toggle_startup_enabled,
+        )
+        ###############################
+        ##### Windows 자동실행 추가 끝   #####
+        ###############################
         self.menu.add_command(label="종료", command=self.root.destroy)
 
         self.apply_layout()
@@ -281,6 +407,13 @@ class DesktopPet:
         self.schedule_smart_update(initial=True)
         self.schedule_behavior_tick(initial=True)
         self.schedule_resource_update(initial=True)
+        ###############################
+        ##### CODEX 연동 추가 시작 #####
+        ###############################
+        self.schedule_codex_update(initial=True)
+        ###############################
+        ##### CODEX 연동 추가 끝   #####
+        ###############################
 
     def now_ms(self) -> int:
         return self.root.tk.getint(self.root.tk.call("clock", "milliseconds"))
@@ -345,69 +478,646 @@ class DesktopPet:
             ram = int(memory.dwMemoryLoad)
         return int(cpu), int(ram)
 
+    ###############################
+    ##### CODEX 연동 추가 시작 #####
+    ###############################
+    def codex_home_candidates(self) -> list[Path]:
+        candidates: list[Path] = []
+        env_home = os.environ.get("CODEX_HOME")
+        if env_home:
+            candidates.append(Path(env_home))
+        candidates.append(Path.home() / ".codex")
+        unique: list[Path] = []
+        seen: set[str] = set()
+        for candidate in candidates:
+            key = str(candidate).casefold()
+            if key not in seen:
+                unique.append(candidate)
+                seen.add(key)
+        return unique
+
+    def find_codex_state_db(self) -> Path | None:
+        for codex_home in self.codex_home_candidates():
+            if not codex_home.exists():
+                continue
+            try:
+                db_paths = sorted(
+                    codex_home.glob("state_*.sqlite"),
+                    key=lambda path: path.stat().st_mtime,
+                    reverse=True,
+                )
+            except OSError:
+                continue
+            if db_paths:
+                return db_paths[0]
+        return None
+
+    def normalize_path_text(self, value: str | Path) -> str:
+        path_text = str(value)
+        if path_text.startswith("\\\\?\\"):
+            path_text = path_text[4:]
+        try:
+            return str(Path(path_text).resolve()).casefold()
+        except OSError:
+            return os.path.abspath(path_text).casefold()
+
+    def codex_workspace_candidates(self) -> list[Path]:
+        raw_candidates = [
+            os.environ.get("GP_CHAN_CODEX_CWD"),
+            os.environ.get("CODEX_WORKSPACE"),
+            os.environ.get("PWD"),
+        ]
+        candidates = [Path(value) for value in raw_candidates if value]
+        candidates.extend([ROOT, Path.cwd()])
+        if getattr(sys, "frozen", False):
+            exe_root = Path(sys.executable).resolve().parent
+            candidates.extend([exe_root, exe_root.parent])
+
+        unique: list[Path] = []
+        seen: set[str] = set()
+        for candidate in candidates:
+            key = self.normalize_path_text(candidate)
+            if key not in seen:
+                unique.append(candidate)
+                seen.add(key)
+        return unique
+
+    def preferred_codex_thread_id(self) -> str:
+        return str(os.environ.get("GP_CHAN_CODEX_THREAD_ID") or "").strip()
+
+    def read_recent_jsonl_lines(self, path: Path, max_bytes: int = CODEX_ROLLOUT_TAIL_BYTES) -> list[str]:
+        size = path.stat().st_size
+        with path.open("rb") as file:
+            start = max(0, size - max_bytes)
+            file.seek(start)
+            data = file.read()
+        text = data.decode("utf-8", errors="replace")
+        lines = text.splitlines()
+        if start > 0 and lines:
+            lines = lines[1:]
+        return lines
+
+    def compact_codex_text(self, text: object, max_chars: int = 22) -> str:
+        compacted = " ".join(str(text or "").replace("\x00", " ").split())
+        if not compacted:
+            return ""
+        home = str(Path.home())
+        compacted = compacted.replace(home, "~").replace(home.replace("\\", "/"), "~")
+        if len(compacted) <= max_chars:
+            return compacted
+        return compacted[: max(1, max_chars - 1)].rstrip() + "..."
+    ###############################
+    ##### CODEX 연동 추가 끝   #####
+    ###############################
+
+    ###############################
+    ##### Windows 자동실행 추가 시작 #####
+    ###############################
+    def startup_command_text(self) -> str:
+        if getattr(sys, "frozen", False):
+            return f'"{Path(sys.executable).resolve()}"'
+        python_exe = Path(sys.executable).resolve()
+        pythonw_exe = python_exe.with_name("pythonw.exe")
+        launcher = pythonw_exe if pythonw_exe.exists() else python_exe
+        script_path = Path(__file__).resolve()
+        return f'"{launcher}" "{script_path}"'
+
+    def is_startup_enabled(self) -> bool:
+        try:
+            with winreg.OpenKey(winreg.HKEY_CURRENT_USER, STARTUP_RUN_KEY, 0, winreg.KEY_READ) as key:
+                value, _value_type = winreg.QueryValueEx(key, STARTUP_VALUE_NAME)
+        except FileNotFoundError:
+            return False
+        except OSError:
+            return False
+        return str(value or "").strip() == self.startup_command_text()
+
+    def set_startup_enabled(self, enabled: bool) -> None:
+        if enabled:
+            with winreg.CreateKey(winreg.HKEY_CURRENT_USER, STARTUP_RUN_KEY) as key:
+                winreg.SetValueEx(key, STARTUP_VALUE_NAME, 0, winreg.REG_SZ, self.startup_command_text())
+            return
+        with winreg.CreateKey(winreg.HKEY_CURRENT_USER, STARTUP_RUN_KEY) as key:
+            try:
+                winreg.DeleteValue(key, STARTUP_VALUE_NAME)
+            except FileNotFoundError:
+                pass
+
+    def refresh_startup_menu_state(self) -> None:
+        self.startup_enabled_var.set(self.is_startup_enabled())
+
+    def toggle_startup_enabled(self) -> None:
+        enabled = bool(self.startup_enabled_var.get())
+        try:
+            self.set_startup_enabled(enabled)
+        except OSError:
+            self.refresh_startup_menu_state()
+            self.show_status("자동실행 실패")
+            return
+        self.refresh_startup_menu_state()
+        self.show_status("자동실행 on" if self.startup_enabled_var.get() else "자동실행 off")
+    ###############################
+    ##### Windows 자동실행 추가 끝   #####
+    ###############################
+
+    ###############################
+    ##### CODEX 연동 추가 시작 #####
+    ###############################
+    def compact_codex_preview(self, text: object, max_chars: int = 44) -> str:
+        compacted = self.compact_codex_text(text, max_chars)
+        compacted = compacted.replace("`", "")
+        compacted = re.sub(r"\s+", " ", compacted).strip()
+        return compacted
+
+    def command_path_name(self, command: str) -> str:
+        markers = ("-LiteralPath", "-Path", "--path", "--file", "-Filter")
+        lower = command.casefold()
+        token = ""
+        for marker in markers:
+            index = lower.find(marker.casefold())
+            if index == -1:
+                continue
+            rest = command[index + len(marker):].strip()
+            if not rest:
+                continue
+            if rest[0] in {"'", '"'}:
+                quote = rest[0]
+                end = rest.find(quote, 1)
+                token = rest[1:end] if end > 1 else rest[1:]
+            else:
+                token = rest.split()[0]
+            break
+        if not token:
+            return ""
+        return Path(token.strip("'\"")).name
+
+    def command_pattern_name(self, command: str) -> str:
+        markers = ("-Pattern",)
+        lower = command.casefold()
+        token = ""
+        for marker in markers:
+            index = lower.find(marker.casefold())
+            if index == -1:
+                continue
+            rest = command[index + len(marker):].strip()
+            if not rest:
+                continue
+            if rest[0] in {"'", '"'}:
+                quote = rest[0]
+                end = rest.find(quote, 1)
+                token = rest[1:end] if end > 1 else rest[1:]
+            else:
+                token = rest.split()[0]
+            break
+        return self.compact_codex_preview(token, 18) if token else ""
+
+    def shell_command_text(self, command: object) -> str:
+        if isinstance(command, list | tuple):
+            parts = [str(part) for part in command]
+            lowered = [part.casefold() for part in parts]
+            for flag in ("-command", "/c"):
+                if flag in lowered:
+                    index = lowered.index(flag)
+                    if index + 1 < len(parts):
+                        return str(parts[index + 1])
+            return " ".join(parts)
+
+        text = str(command or "")
+        stripped = text.strip()
+        if stripped.startswith("[") and stripped.endswith("]"):
+            try:
+                parsed = ast.literal_eval(stripped)
+            except (SyntaxError, ValueError):
+                parsed = None
+            if isinstance(parsed, list | tuple):
+                return self.shell_command_text(parsed)
+        return text
+
+    def summarize_shell_command(self, command: object) -> str:
+        text = " ".join(self.shell_command_text(command).split())
+        if not text:
+            return "명령 준비중"
+        lower = text.casefold()
+        path_name = self.command_path_name(text)
+        pattern_name = self.command_pattern_name(text)
+        if "pyinstaller" in lower:
+            return "GP-Chan.exe 빌드"
+        if "py_compile" in lower:
+            return f"문법 확인 {path_name or '코드'}"
+        if lower.startswith("get-content"):
+            return f"읽는중 {path_name or '파일'}"
+        if lower.startswith("select-string"):
+            detail = f"{path_name or '코드'} / {pattern_name}" if pattern_name else (path_name or "코드")
+            return f"검색중 {detail}"
+        if lower.startswith("get-childitem"):
+            return "파일 탐색중"
+        if lower.startswith("git status"):
+            return "git 상태 확인"
+        if lower.startswith("git "):
+            return self.compact_codex_preview(text, 36)
+        if lower.startswith("python") or "| python" in lower:
+            return f"Python 실행 {path_name or ''}".rstrip()
+        return self.compact_codex_preview(text, 36)
+
+    def codex_status_text(self, title: str, detail: str = "") -> str:
+        detail = detail.strip()
+        if not detail:
+            return title
+        return f"{title}\n{detail}"
+
+    def codex_function_arguments(self, payload: dict[str, object]) -> dict[str, object]:
+        arguments = payload.get("arguments")
+        if isinstance(arguments, dict):
+            return arguments
+        if isinstance(arguments, str):
+            try:
+                parsed = json.loads(arguments)
+            except json.JSONDecodeError:
+                return {}
+            if isinstance(parsed, dict):
+                return parsed
+        return {}
+
+    def codex_short_detail(self, text: object, max_chars: int = 12, fallback: str = "") -> str:
+        detail = self.compact_codex_preview(text, max_chars)
+        return detail if detail else fallback
+
+    def codex_message_text(self, content: object, max_chars: int = 22, fallback: str = "") -> str:
+        if isinstance(content, str):
+            return self.codex_short_detail(content, max_chars, fallback)
+        if isinstance(content, dict):
+            text = content.get("text") or content.get("message") or content.get("content")
+            return self.codex_message_text(text, max_chars, fallback)
+        if isinstance(content, list):
+            parts: list[str] = []
+            for item in content:
+                if isinstance(item, str):
+                    parts.append(item)
+                    continue
+                if not isinstance(item, dict):
+                    continue
+                item_type = str(item.get("type") or "")
+                if item_type in {"output_text", "input_text", "text"}:
+                    text = item.get("text") or item.get("content")
+                    if text:
+                        parts.append(str(text))
+            if parts:
+                return self.codex_short_detail(" ".join(parts), max_chars, fallback)
+        return fallback
+
+    def codex_event_label(self, outer_type: str, payload: dict[str, object]) -> str | None:
+        payload_type = payload.get("type")
+        if outer_type == "event_msg":
+            if payload_type == "task_started":
+                return "생각중"
+            if payload_type == "user_message":
+                return None
+            if payload_type == "agent_message":
+                return self.codex_message_text(payload.get("message"), 24, "답변중")
+            if payload_type == "task_complete":
+                return None
+            if payload_type == "exec_command_end":
+                return None
+        if outer_type == "response_item":
+            if payload_type == "reasoning":
+                return "생각중"
+            if payload_type == "function_call":
+                return None
+            if payload_type == "message":
+                role = str(payload.get("role") or "").strip().lower()
+                if role and role != "assistant":
+                    return None
+                return self.codex_message_text(payload.get("content"), 24, "답변중")
+            if payload_type == "web_search_call":
+                return None
+        return None
+
+    def read_codex_rollout_state(
+        self,
+        rollout_path: str,
+    ) -> tuple[float | None, float | None, int | None, int | None, str, str, str, tuple[tuple[str, str], ...]]:
+        path = Path(rollout_path)
+        if not path.exists():
+            return None, None, None, None, "", "", "", ()
+
+        primary_used_percent: float | None = None
+        secondary_used_percent: float | None = None
+        primary_resets_at: int | None = None
+        secondary_resets_at: int | None = None
+        plan_type = ""
+        event_signature = ""
+        event_label = ""
+        event_entries: list[tuple[str, str]] = []
+
+        for line in self.read_recent_jsonl_lines(path):
+            try:
+                item = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+
+            payload = item.get("payload") or {}
+            if not isinstance(payload, dict):
+                continue
+
+            if payload.get("type") == "token_count":
+                rate_limits = payload.get("rate_limits")
+                if isinstance(rate_limits, dict):
+                    plan_type = str(rate_limits.get("plan_type") or "")
+                    primary = rate_limits.get("primary")
+                    secondary = rate_limits.get("secondary")
+                    if isinstance(primary, dict):
+                        value = primary.get("used_percent")
+                        primary_used_percent = float(value) if isinstance(value, int | float) else None
+                        reset_value = primary.get("resets_at")
+                        primary_resets_at = int(reset_value) if isinstance(reset_value, int | float) else None
+                    if isinstance(secondary, dict):
+                        value = secondary.get("used_percent")
+                        secondary_used_percent = float(value) if isinstance(value, int | float) else None
+                        reset_value = secondary.get("resets_at")
+                        secondary_resets_at = int(reset_value) if isinstance(reset_value, int | float) else None
+
+            label = self.codex_event_label(str(item.get("type") or ""), payload)
+            if label:
+                timestamp = str(item.get("timestamp") or "")
+                call_id = str(payload.get("call_id") or "")
+                payload_type = str(payload.get("type") or "")
+                event_signature = f"{timestamp}|{payload_type}|{call_id}"
+                event_label = label
+                event_entries.append((event_signature, event_label))
+
+        return (
+            primary_used_percent,
+            secondary_used_percent,
+            primary_resets_at,
+            secondary_resets_at,
+            plan_type,
+            event_signature,
+            event_label,
+            tuple(event_entries[-48:]),
+        )
+
+    def codex_new_event_entries(
+        self,
+        entries: tuple[tuple[str, str], ...],
+        previous_signature: str,
+    ) -> list[tuple[str, str]]:
+        if not entries:
+            return []
+        if not previous_signature:
+            return []
+        for index, (signature, _label) in enumerate(entries):
+            if signature == previous_signature:
+                return list(entries[index + 1:])
+        return [entries[-1]]
+
+    def read_codex_state(self) -> CodexState:
+        state_db = self.find_codex_state_db()
+        if state_db is None:
+            return CodexState()
+
+        workspace_paths = {
+            self.normalize_path_text(path)
+            for path in self.codex_workspace_candidates()
+        }
+        preferred_thread_id = self.preferred_codex_thread_id()
+        connection: sqlite3.Connection | None = None
+        try:
+            connection = sqlite3.connect(f"file:{state_db}?mode=ro", uri=True, timeout=0.2)
+            rows = connection.execute(
+                """
+                SELECT id, title, rollout_path, updated_at_ms, updated_at, tokens_used, cwd
+                FROM threads
+                WHERE archived = 0
+                ORDER BY COALESCE(updated_at_ms, updated_at * 1000) DESC
+                LIMIT 60
+                """
+            ).fetchall()
+        except sqlite3.Error:
+            return CodexState()
+        finally:
+            if connection is not None:
+                connection.close()
+
+        for thread_id, title, rollout_path, updated_at_ms, updated_at, tokens_used, cwd in rows:
+            if preferred_thread_id and str(thread_id or "") != preferred_thread_id:
+                continue
+            if not cwd or self.normalize_path_text(str(cwd)) not in workspace_paths:
+                continue
+            try:
+                (
+                    primary_used,
+                    secondary_used,
+                    primary_resets_at,
+                    secondary_resets_at,
+                    plan_type,
+                    signature,
+                    label,
+                    event_entries,
+                ) = self.read_codex_rollout_state(str(rollout_path))
+            except OSError:
+                primary_used, secondary_used = None, None
+                primary_resets_at, secondary_resets_at = None, None
+                plan_type, signature, label, event_entries = "", "", "", ()
+            return CodexState(
+                available=True,
+                thread_id=str(thread_id or ""),
+                title=str(title or ""),
+                tokens_used=int(tokens_used or 0),
+                plan_type=plan_type,
+                primary_used_percent=primary_used,
+                secondary_used_percent=secondary_used,
+                primary_resets_at=primary_resets_at,
+                secondary_resets_at=secondary_resets_at,
+                updated_at_ms=int(updated_at_ms or (updated_at or 0) * 1000),
+                event_signature=signature,
+                event_label=label,
+                event_entries=event_entries,
+            )
+
+        return CodexState()
+    ###############################
+    ##### CODEX 연동 추가 끝   #####
+    ###############################
+
+    ###############################
+    ##### CODEX 연동 추가 시작 #####
+    ###############################
+    def format_codex_tokens(self, tokens: int) -> str:
+        if tokens >= 1_000_000:
+            return f"{tokens / 1_000_000:.1f}M"
+        if tokens >= 1_000:
+            return f"{round(tokens / 1_000):d}K"
+        return str(max(0, tokens))
+
+    def codex_left_percent(self, used_percent: float | None) -> int | None:
+        if used_percent is None:
+            return None
+        return max(0, min(100, 100 - round(used_percent)))
+
+    def format_codex_percent(self, used_percent: float | None) -> str:
+        left_percent = self.codex_left_percent(used_percent)
+        if left_percent is None:
+            return "00%"
+        return f"{left_percent:02d}%" if left_percent < 100 else "100%"
+
+    def format_codex_reset(self, reset_at: int | None) -> str:
+        if not reset_at:
+            return ""
+        reset_time = datetime.fromtimestamp(int(reset_at))
+        return reset_time.strftime("%H:%M")
+
+    def resource_panel_metrics(self) -> tuple[int, int]:
+        scale = self.scale
+        width = max(134, round(134 * scale))
+        margin_y = max(5, round(5 * scale))
+        gap = max(6, round(6 * scale))
+        row_height = max(23, round(23 * scale))
+        codex_visible = self.codex_panel_enabled and self.codex_state.available
+        codex_height = max(58, round(58 * scale)) if codex_visible else 0
+        height = margin_y * 2 + row_height * 2 + gap
+        if codex_visible:
+            height += codex_height + gap
+        return width, height
+
     def render_resource_panel(self, cpu: int, ram: int) -> Image.Image:
         scale = self.scale
-        gauge_width = max(14, round(13 * scale))
-        gauge_height = max(78, round(78 * scale))
+        width, height = self.resource_panel_metrics()
         gap = max(5, round(5 * scale))
-        margin_x = max(2, round(2 * scale))
-        margin_y = max(2, round(2 * scale))
-        width = gauge_width * 2 + gap + margin_x * 2
-        height = gauge_height + margin_y * 2
+        margin_x = max(4, round(4 * scale))
+        margin_y = max(4, round(4 * scale))
+        codex_visible = self.codex_panel_enabled and self.codex_state.available
         image = Image.new("RGBA", (width, height), (0, 0, 0, 0))
         draw = ImageDraw.Draw(image)
-        label_font = self.get_status_font(max(8, round(7 * scale)))
-        value_font = self.get_status_font(max(17, round(15 * scale)))
+        label_font = self.get_status_font(max(10, round(9 * scale)))
+        value_font = self.get_status_font(max(11, round(11 * scale)))
+        codex_label_font = self.get_status_font(max(10, round(10 * scale)))
+        codex_value_font = self.get_status_font(max(13, round(13 * scale)))
         radius = max(6, round(6 * scale))
         outline_width = max(1, round(1.4 * scale))
-        inner_pad = max(3, round(3 * scale))
-        label_pad = max(8, round(8 * scale))
+        row_height = max(23, round(23 * scale))
+        row_width = width - margin_x * 2
+        top = margin_y
+
+        if codex_visible:
+            codex_height = max(58, round(58 * scale))
+            codex_rect = (margin_x, top, width - margin_x, top + codex_height)
+            draw.rounded_rectangle(
+                codex_rect,
+                radius=radius,
+                fill=(250, 248, 255, 250),
+                outline=(133, 104, 255, 255),
+                width=outline_width,
+            )
+            title = "CODEX"
+            title_box = draw.textbbox((0, 0), title, font=codex_label_font)
+            title_x = (width - (title_box[2] - title_box[0])) // 2 - title_box[0]
+            title_y = top + max(3, round(3 * scale)) - title_box[1]
+            draw.text((title_x, title_y), title, font=codex_label_font, fill=(65, 54, 120, 225))
+
+            codex_lines = (
+                f"5시간 {self.format_codex_percent(self.codex_state.primary_used_percent)}",
+                f"1주일 {self.format_codex_percent(self.codex_state.secondary_used_percent)}",
+            )
+            for line_index, line in enumerate(codex_lines):
+                line_box = draw.textbbox((0, 0), line, font=codex_value_font)
+                line_x = (width - (line_box[2] - line_box[0])) // 2 - line_box[0]
+                line_y = top + round((21 + line_index * 18) * scale) - line_box[1]
+                draw.text((line_x, line_y), line, font=codex_value_font, fill=(39, 35, 72, 245))
+            top += codex_height + gap
 
         gauges = [
-            ("CPU", cpu, (13, 178, 230, 255), (227, 249, 255, 250)),
-            ("RAM", ram, (0, 188, 105, 255), (229, 255, 241, 250)),
+            ("CPU", cpu, (13, 178, 230, 255), (227, 249, 255, 250), (42, 92, 108, 235)),
+            ("RAM", ram, (0, 188, 105, 255), (229, 255, 241, 250), (35, 101, 70, 235)),
         ]
-        for index, (label, percent, color, track_fill) in enumerate(gauges):
-            left = margin_x + index * (gauge_width + gap)
-            top = margin_y
-            right = left + gauge_width
-            bottom = top + gauge_height
-            track = (left, top, right, bottom)
-            draw.rounded_rectangle(track, radius=radius, fill=track_fill, outline=color, width=outline_width)
-
-            inner_left = left + inner_pad
-            inner_right = right - inner_pad
-            inner_top = top + label_pad
-            inner_bottom = bottom - inner_pad
-            fill_height = round((inner_bottom - inner_top) * max(0, min(100, percent)) / 100)
-            fill_top = inner_bottom - fill_height
-            if fill_height > 0:
+        for label, percent, color, track_fill, text_fill in gauges:
+            left = margin_x
+            right = left + row_width
+            bottom = top + row_height
+            draw.rounded_rectangle(
+                (left, top, right, bottom),
+                radius=radius,
+                fill=track_fill,
+                outline=color,
+                width=outline_width,
+            )
+            fill_width = round(row_width * max(0, min(100, percent)) / 100)
+            if fill_width > 0:
                 draw.rounded_rectangle(
-                    (inner_left, fill_top, inner_right, inner_bottom),
-                    radius=max(2, round(2 * scale)),
+                    (left, top, left + fill_width, bottom),
+                    radius=radius,
                     fill=color,
                 )
 
-            label_box = draw.textbbox((0, 0), label, font=label_font)
-            label_x = left + (gauge_width - (label_box[2] - label_box[0])) // 2 - label_box[0]
-            label_y = top + max(2, round(2 * scale)) - label_box[1]
-            draw.text((label_x, label_y), label, font=label_font, fill=(45, 83, 96, 215))
+            label_box = draw.textbbox((0, 0), label, font=label_font, stroke_width=max(1, round(1 * scale)))
+            label_x = left + max(6, round(6 * scale)) - label_box[0]
+            label_y = top + (row_height - (label_box[3] - label_box[1])) // 2 - label_box[1]
+            draw.text(
+                (label_x, label_y),
+                label,
+                font=label_font,
+                fill=text_fill,
+                stroke_width=max(1, round(1 * scale)),
+                stroke_fill=(255, 255, 255, 220),
+            )
 
-            value = str(percent)
+            value = f"{max(0, min(100, int(percent)))}%"
             value_box = draw.textbbox((0, 0), value, font=value_font, stroke_width=max(1, round(1 * scale)))
-            value_x = left + (gauge_width - (value_box[2] - value_box[0])) // 2 - value_box[0]
-            value_y = top + (gauge_height - (value_box[3] - value_box[1])) // 2 - value_box[1] + round(4 * scale)
+            value_x = right - max(6, round(6 * scale)) - (value_box[2] - value_box[0]) - value_box[0]
+            value_y = top + (row_height - (value_box[3] - value_box[1])) // 2 - value_box[1]
             draw.text(
                 (value_x, value_y),
                 value,
                 font=value_font,
                 fill=(26, 38, 46, 255),
                 stroke_width=max(1, round(1 * scale)),
-                stroke_fill=(255, 255, 255, 210),
+                stroke_fill=(255, 255, 255, 225),
             )
+            top += row_height + gap
         return image
+    ###############################
+    ##### CODEX 연동 추가 끝   #####
+    ###############################
 
-    def render_status_bubble(self, text: str) -> Image.Image:
+    ###############################
+    ##### CODEX 연동 추가 시작 #####
+    ###############################
+    def wrap_status_text(
+        self,
+        text: str,
+        draw: ImageDraw.ImageDraw,
+        font: ImageFont.FreeTypeFont | ImageFont.ImageFont,
+        stroke_width: int,
+        max_text_width: int,
+        max_lines: int,
+    ) -> str:
+        lines: list[str] = []
+        for paragraph in str(text or "").splitlines() or [""]:
+            paragraph = " ".join(paragraph.split())
+            if not paragraph:
+                continue
+            current = ""
+            for char in paragraph:
+                candidate = current + char
+                width = draw.textbbox((0, 0), candidate, font=font, stroke_width=stroke_width)[2]
+                if current and width > max_text_width:
+                    lines.append(current.rstrip())
+                    current = char
+                else:
+                    current = candidate
+            if current:
+                lines.append(current.rstrip())
+        if not lines:
+            return ""
+        if len(lines) <= max_lines:
+            return "\n".join(lines)
+        visible = lines[:max_lines]
+        last_line = visible[-1]
+        while last_line and draw.textbbox((0, 0), last_line + "...", font=font, stroke_width=stroke_width)[2] > max_text_width:
+            last_line = last_line[:-1]
+        visible[-1] = (last_line or visible[-1][:1]).rstrip() + "..."
+        return "\n".join(visible)
+
+    def render_status_bubble(self, text: str, variant: str = "default") -> Image.Image:
         font_size = max(12, round(12 * self.scale))
         stroke_width = max(1, round(1.35 * self.scale))
         padding_x = max(12, round(11 * self.scale))
@@ -416,11 +1126,20 @@ class DesktopPet:
         tail_width = max(12, round(12 * self.scale))
         tail_height = max(8, round(8 * self.scale))
         outline_width = max(2, round(1.3 * self.scale))
+        max_text_width = max(138, round(146 * self.scale)) if variant == "codex" else max(96, round(102 * self.scale))
 
         font = self.get_status_font(font_size)
         probe = Image.new("RGBA", (1, 1), (0, 0, 0, 0))
         draw = ImageDraw.Draw(probe)
-        left, top, right, bottom = draw.textbbox((0, 0), text, font=font, stroke_width=stroke_width)
+        wrapped_text = self.wrap_status_text(text, draw, font, stroke_width, max_text_width, 2 if variant == "codex" else 1)
+        left, top, right, bottom = draw.multiline_textbbox(
+            (0, 0),
+            wrapped_text,
+            font=font,
+            stroke_width=stroke_width,
+            spacing=max(1, round(2 * self.scale)),
+            align="center",
+        )
         text_width = right - left
         text_height = bottom - top
         bubble_width = max(round(44 * self.scale), text_width + padding_x * 2)
@@ -434,7 +1153,7 @@ class DesktopPet:
         tail_right = (round(bubble_width * 0.40) + tail_width, body_height - outline_width - 1)
         shadow_offset = max(1, round(1.3 * self.scale))
 
-        shadow_fill = (113, 169, 190, 76)
+        shadow_fill = (113, 169, 190, 76) if variant == "default" else (99, 107, 160, 72)
         draw.rounded_rectangle(
             (
                 body_rect[0] + shadow_offset,
@@ -454,28 +1173,41 @@ class DesktopPet:
             fill=shadow_fill,
         )
 
-        outline = (101, 205, 229, 255)
-        fill = (255, 255, 252, 255)
+        if variant == "codex":
+            outline = (72, 104, 164, 255)
+            fill = (247, 250, 255, 255)
+            text_fill = (32, 47, 84, 255)
+            stroke_fill = (255, 255, 255, 255)
+        else:
+            outline = (101, 205, 229, 255)
+            fill = (255, 255, 252, 255)
+            text_fill = (38, 70, 88, 255)
+            stroke_fill = (255, 255, 255, 255)
         draw.rounded_rectangle(body_rect, radius=radius, fill=fill, outline=outline, width=outline_width)
         draw.polygon([tail_left, tail_right, tail_tip], fill=fill, outline=outline)
         draw.line([tail_left, tail_tip, tail_right], fill=outline, width=outline_width, joint="curve")
 
         text_x = (bubble_width - text_width) // 2 - left
         text_y = (body_height - text_height) // 2 - top - max(0, round(0.5 * self.scale))
-        draw.text(
+        draw.multiline_text(
             (text_x, text_y),
-            text,
+            wrapped_text,
             font=font,
-            fill=(38, 70, 88, 255),
+            fill=text_fill,
             stroke_width=stroke_width,
-            stroke_fill=(255, 255, 255, 255),
+            stroke_fill=stroke_fill,
+            spacing=max(1, round(2 * self.scale)),
+            align="center",
         )
         return image
+    ###############################
+    ##### CODEX 연동 추가 끝   #####
+    ###############################
 
     def load_frame_sources(self, action_name: str) -> list[Image.Image]:
         if action_name not in self.frame_sources:
             self.frame_sources[action_name] = [
-                Image.open(ROOT / frame_path).convert("RGBA")
+                Image.open(BUNDLE_ROOT / frame_path).convert("RGBA")
                 for frame_path in self.actions[action_name]["frames"]
             ]
         return self.frame_sources[action_name]
@@ -507,12 +1239,17 @@ class DesktopPet:
             self.frame_cache[cache_key] = frames
         return self.frame_cache[cache_key]
 
+    ###############################
+    ##### CODEX 연동 추가 시작 #####
+    ###############################
     def apply_layout(self) -> None:
         pet_size = max(1, round(self.cell_size * self.scale))
-        bubble_space_x = max(94, round(94 * self.scale))
-        bubble_space_y = max(34, round(38 * self.scale))
-        canvas_width = pet_size + bubble_space_x + 24
-        canvas_height = pet_size + bubble_space_y + 18
+        panel_width, panel_height = self.resource_panel_metrics()
+        bubble_space_x = max(168, round(176 * self.scale))
+        bubble_space_y = max(54, round(58 * self.scale))
+        canvas_width = 12 + pet_size + max(4, round(4 * self.scale)) + panel_width + 12
+        canvas_width = max(canvas_width, pet_size + bubble_space_x + 24)
+        canvas_height = max(pet_size + bubble_space_y + 18, panel_height + max(18, round(18 * self.scale)))
         center_x = 12 + pet_size // 2
         center_y = bubble_space_y + pet_size // 2
         self.canvas.configure(width=canvas_width, height=canvas_height)
@@ -520,6 +1257,9 @@ class DesktopPet:
         self.update_sparkles()
         self.redraw_status()
         self.redraw_resource_panel()
+    ###############################
+    ##### CODEX 연동 추가 끝   #####
+    ###############################
 
     def animate(self) -> None:
         frames = self.load_frames(self.action)
@@ -540,30 +1280,52 @@ class DesktopPet:
             self.set_action("idle")
         self.animate()
 
+    ###############################
+    ##### CODEX 연동 추가 시작 #####
+    ###############################
     def show_status(self, text: str, duration_ms: int = STATUS_SHOW_MS, protect_ms: int = 0) -> None:
         self.last_state_label = text
         self.status_text_value = text
         self.status_until = self.now_ms() + duration_ms
         if protect_ms:
             self.status_protect_until = max(self.status_protect_until, self.now_ms() + protect_ms)
-        cache_key = (text, self.scale)
+        cache_key = (text, self.scale, "default")
         if cache_key not in self.status_cache:
-            self.status_cache[cache_key] = ImageTk.PhotoImage(self.render_status_bubble(text))
+            self.status_cache[cache_key] = ImageTk.PhotoImage(self.render_status_bubble(text, variant="default"))
         self.status_photo = self.status_cache[cache_key]
         self.canvas.itemconfigure(self.status_item, image=self.status_photo)
         self.redraw_status()
 
+    def show_codex_status(self, text: str, duration_ms: int = CODEX_EVENT_SHOW_MS) -> None:
+        self.codex_status_text = text
+        self.codex_status_until = self.now_ms() + duration_ms
+        cache_key = (text, self.scale, "codex")
+        if cache_key not in self.status_cache:
+            self.status_cache[cache_key] = ImageTk.PhotoImage(self.render_status_bubble(text, variant="codex"))
+        self.codex_status_photo = self.status_cache[cache_key]
+        self.redraw_status()
+
     def clear_status_if_needed(self) -> None:
+        if self.codex_status_until and self.now_ms() >= self.codex_status_until:
+            self.codex_status_until = 0
+            self.codex_status_text = ""
+            self.codex_status_photo = None
+            self.redraw_status()
         if self.status_until and self.now_ms() >= self.status_until:
             self.status_until = 0
             self.status_protect_until = 0
             self.last_state_label = ""
             self.status_text_value = ""
-            self.canvas.itemconfigure(self.status_item, image="")
             self.redraw_status()
 
     def redraw_status(self) -> None:
-        if not self.status_text_value or self.status_photo is None:
+        active_photo: ImageTk.PhotoImage | None = None
+        if self.codex_status_text and self.codex_status_photo is not None and self.now_ms() < self.codex_status_until:
+            active_photo = self.codex_status_photo
+        elif self.status_text_value and self.status_photo is not None:
+            active_photo = self.status_photo
+
+        if active_photo is None:
             self.canvas.itemconfigure(self.status_item, state="hidden")
             return
         canvas_width = int(self.canvas.cget("width"))
@@ -572,25 +1334,34 @@ class DesktopPet:
         center_y = max(34, round(38 * self.scale)) + pet_size // 2
         wobble_x = round(math.sin(self.sparkle_phase * 1.2) * max(1, self.scale))
         wobble_y = -round(abs(math.sin(self.sparkle_phase * 0.9)) * max(1, self.scale))
-        bubble_x = min(canvas_width - self.status_photo.width() // 2 - 4, center_x + round(pet_size * 0.31))
-        bubble_y = max(self.status_photo.height() // 2 + 2, center_y - round(pet_size * 0.34))
-        self.canvas.itemconfigure(self.status_item, state="normal")
+        bubble_x = min(canvas_width - active_photo.width() // 2 - 4, center_x + round(pet_size * 0.31))
+        bubble_y = max(active_photo.height() // 2 + 2, center_y - round(pet_size * 0.34))
+        self.canvas.itemconfigure(self.status_item, state="normal", image=active_photo)
         self.canvas.coords(self.status_item, bubble_x + wobble_x, bubble_y + wobble_y)
         self.canvas.tag_raise(self.status_item)
+    ###############################
+    ##### CODEX 연동 추가 끝   #####
+    ###############################
 
+    ###############################
+    ##### CODEX 연동 추가 시작 #####
+    ###############################
     def redraw_resource_panel(self) -> None:
         if self.resource_photo is None:
             self.canvas.itemconfigure(self.resource_item, state="hidden")
             return
         pet_size = max(1, round(self.cell_size * self.scale))
-        bubble_space_y = max(34, round(38 * self.scale))
         center_x = 12 + pet_size // 2
-        center_y = bubble_space_y + pet_size // 2
-        panel_x = center_x + round(pet_size * 0.43)
-        panel_y = center_y + round(pet_size * 0.18)
+        panel_left = center_x + pet_size // 2 + max(4, round(4 * self.scale))
+        panel_top = max(6, round(6 * self.scale))
+        panel_x = panel_left + self.resource_photo.width() // 2
+        panel_y = panel_top + self.resource_photo.height() // 2
         self.canvas.itemconfigure(self.resource_item, state="normal", image=self.resource_photo)
         self.canvas.coords(self.resource_item, panel_x, panel_y)
         self.canvas.tag_raise(self.resource_item)
+    ###############################
+    ##### CODEX 연동 추가 끝   #####
+    ###############################
 
     def show_hit_effect(self, x: int, y: int) -> None:
         for item in self.hit_effect_items:
@@ -633,9 +1404,9 @@ class DesktopPet:
             self.hit_effect_items = []
 
     def update_sparkles(self) -> None:
-        canvas_width = int(self.canvas.cget("width"))
         pet_size = max(1, round(self.cell_size * self.scale))
-        base_x = canvas_width // 2 + int(pet_size * 0.2)
+        center_x = 12 + pet_size // 2
+        base_x = center_x + int(pet_size * 0.2)
         base_y = 18 + (self.sparkle_phase % 2)
         pulse = (self.sparkle_phase % 6)
         arm = 5 + (1 if pulse in {1, 4} else 0)
@@ -682,17 +1453,27 @@ class DesktopPet:
             hold_ms=MENU_ACTION_LOCK_MS,
         )
 
+    ###############################
+    ##### CODEX 연동 추가 시작 #####
+    ###############################
     def set_scale(self, scale: float) -> None:
         self.scale = scale
         if self.status_text_value:
-            cache_key = (self.status_text_value, self.scale)
+            cache_key = (self.status_text_value, self.scale, "default")
             if cache_key not in self.status_cache:
-                self.status_cache[cache_key] = ImageTk.PhotoImage(self.render_status_bubble(self.status_text_value))
+                self.status_cache[cache_key] = ImageTk.PhotoImage(self.render_status_bubble(self.status_text_value, variant="default"))
             self.status_photo = self.status_cache[cache_key]
-            self.canvas.itemconfigure(self.status_item, image=self.status_photo)
+        if self.codex_status_text:
+            cache_key = (self.codex_status_text, self.scale, "codex")
+            if cache_key not in self.status_cache:
+                self.status_cache[cache_key] = ImageTk.PhotoImage(self.render_status_bubble(self.codex_status_text, variant="codex"))
+            self.codex_status_photo = self.status_cache[cache_key]
         self.resource_photo = ImageTk.PhotoImage(self.render_resource_panel(self.cpu_percent, self.ram_percent))
         self.apply_layout()
         self.frame_index = 0
+    ###############################
+    ##### CODEX 연동 추가 끝   #####
+    ###############################
 
     def set_mouse_follow_enabled(self, enabled: bool) -> None:
         self.mouse_follow_enabled = enabled
@@ -701,6 +1482,17 @@ class DesktopPet:
             self.set_action("idle", label="한가함", manual=True, hold_ms=MENU_ACTION_LOCK_MS)
         else:
             self.show_status("추적 on" if enabled else "추적 off")
+
+    ###############################
+    ##### CODEX 연동 추가 시작 #####
+    ###############################
+    def set_codex_panel_enabled(self, enabled: bool) -> None:
+        self.codex_panel_enabled = enabled
+        self.update_codex_panel()
+        self.show_status("Codex on" if enabled else "Codex off")
+    ###############################
+    ##### CODEX 연동 추가 끝   #####
+    ###############################
 
     def get_idle_seconds(self) -> int:
         info = LASTINPUTINFO()
@@ -810,12 +1602,121 @@ class DesktopPet:
         delay = 1200 if initial else RESOURCE_UPDATE_MS
         self.resource_job = self.root.after(delay, self.update_resource_panel)
 
+    ###############################
+    ##### CODEX 연동 추가 시작 #####
+    ###############################
+    def schedule_codex_update(self, initial: bool = False) -> None:
+        if self.codex_job:
+            self.root.after_cancel(self.codex_job)
+        delay = 1500 if initial else CODEX_UPDATE_MS
+        self.codex_job = self.root.after(delay, self.update_codex_panel)
+
+    def schedule_codex_fast_refresh(self) -> None:
+        if self.codex_refresh_job:
+            self.root.after_cancel(self.codex_refresh_job)
+        if self.now_ms() >= self.codex_refresh_deadline_ms:
+            self.codex_refresh_job = None
+            return
+        self.codex_refresh_job = self.root.after(350, self.fast_refresh_codex_panel)
+
+    def schedule_codex_event_drain(self, delay_ms: int = 120) -> None:
+        if self.codex_event_job:
+            self.root.after_cancel(self.codex_event_job)
+        self.codex_event_job = self.root.after(delay_ms, self.drain_codex_event_queue)
+
+    def drain_codex_event_queue(self) -> None:
+        self.codex_event_job = None
+        if not self.codex_pending_events:
+            return
+        now = self.now_ms()
+        if self.codex_status_text and now < self.codex_status_until:
+            wait_ms = max(120, self.codex_status_until - now + 80)
+            self.schedule_codex_event_drain(wait_ms)
+            return
+        _event_signature, event_label = self.codex_pending_events.pop(0)
+        self.show_codex_status(event_label, duration_ms=CODEX_EVENT_SHOW_MS)
+        if self.codex_pending_events:
+            self.schedule_codex_event_drain(CODEX_EVENT_SHOW_MS + 80)
+
+    def apply_codex_panel_update(self, schedule_next: bool) -> None:
+        previous_available = self.codex_state.available
+        previous_signature = self.codex_last_event_signature
+        self.codex_state = self.read_codex_state()
+        if previous_available != self.codex_state.available:
+            self.apply_layout()
+
+        self.resource_photo = ImageTk.PhotoImage(self.render_resource_panel(self.cpu_percent, self.ram_percent))
+        self.canvas.itemconfigure(self.resource_item, image=self.resource_photo)
+        self.redraw_resource_panel()
+
+        entries = self.codex_state.event_entries
+        signature = self.codex_state.event_signature
+        if self.codex_state.available and entries:
+            if self.codex_seen_once:
+                new_entries = self.codex_new_event_entries(entries, previous_signature)
+                if new_entries:
+                    self.codex_pending_events.extend(new_entries)
+                    self.codex_pending_events = self.codex_pending_events[-8:]
+                    self.schedule_codex_event_drain()
+            if self.codex_pending_events and (not self.codex_status_text or self.now_ms() >= self.codex_status_until):
+                self.drain_codex_event_queue()
+            self.codex_last_event_signature = signature
+        elif self.codex_state.available and signature:
+            if self.codex_seen_once and signature != previous_signature and self.codex_state.event_label:
+                self.show_codex_status(
+                    self.codex_state.event_label,
+                    duration_ms=CODEX_EVENT_SHOW_MS,
+                )
+            elif self.codex_state.event_label and (not self.codex_status_text or self.now_ms() >= self.codex_status_until):
+                self.show_codex_status(
+                    self.codex_state.event_label,
+                    duration_ms=CODEX_EVENT_SHOW_MS,
+                )
+            self.codex_last_event_signature = signature
+        elif not self.codex_state.available:
+            self.codex_last_event_signature = ""
+            self.codex_pending_events.clear()
+            self.codex_status_text = ""
+            self.codex_status_until = 0
+            self.codex_status_photo = None
+            if self.codex_event_job:
+                self.root.after_cancel(self.codex_event_job)
+                self.codex_event_job = None
+
+        if self.codex_state.available and not self.codex_seen_once:
+            self.show_codex_status("Codex 연결됨", duration_ms=CODEX_EVENT_SHOW_MS)
+        self.codex_seen_once = self.codex_state.available
+        if schedule_next:
+            self.schedule_codex_update()
+    ###############################
+    ##### CODEX 연동 추가 끝   #####
+    ###############################
+
     def update_resource_panel(self) -> None:
         self.cpu_percent, self.ram_percent = self.read_resource_usage()
         self.resource_photo = ImageTk.PhotoImage(self.render_resource_panel(self.cpu_percent, self.ram_percent))
         self.canvas.itemconfigure(self.resource_item, image=self.resource_photo)
         self.redraw_resource_panel()
         self.schedule_resource_update()
+
+    ###############################
+    ##### CODEX 연동 추가 시작 #####
+    ###############################
+    def update_codex_panel(self) -> None:
+        self.apply_codex_panel_update(schedule_next=True)
+
+    def fast_refresh_codex_panel(self) -> None:
+        self.apply_codex_panel_update(schedule_next=False)
+        self.schedule_codex_fast_refresh()
+
+    def force_codex_refresh(self) -> None:
+        self.codex_refresh_deadline_ms = self.now_ms() + 2500
+        self.show_status("Codex 확인중", duration_ms=2200, protect_ms=900)
+        self.update_codex_panel()
+        self.schedule_codex_fast_refresh()
+    ###############################
+    ##### CODEX 연동 추가 끝   #####
+    ###############################
 
     def apply_smart_state(self) -> None:
         if self.is_action_locked():
@@ -1100,6 +2001,13 @@ class DesktopPet:
     def show_menu(self, event: tk.Event[tk.Misc]) -> None:
         if self.is_action_locked():
             return
+        ###############################
+        ##### Windows 자동실행 추가 시작 #####
+        ###############################
+        self.refresh_startup_menu_state()
+        ###############################
+        ##### Windows 자동실행 추가 끝   #####
+        ###############################
         self.menu.tk_popup(event.x_root, event.y_root)
 
     def run(self) -> None:

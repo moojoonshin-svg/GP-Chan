@@ -56,44 +56,44 @@ python pet.py
 
 ## Actions
 
-| Preview | Action | Caption |
-|---|---|---|
-| <img src="assets/generated/frames/idle/00.png" alt="idle" width="80"> | `idle` | 멍... |
-| <img src="assets/generated/frames/wave/00.png" alt="wave" width="80"> | `wave` | ㅎㅇ |
-| <img src="assets/generated/frames/think/00.png" alt="think" width="80"> | `think` | 흠... |
-| <img src="assets/generated/frames/typing/00.png" alt="typing" width="80"> | `typing` | 토큰입력중 / 타닥타닥 / 작성중 |
-| <img src="assets/generated/frames/cheer/00.png" alt="cheer" width="80"> | `cheer` | 힘내 휴먼 / 할수있다 / 가보자 |
-| <img src="assets/generated/frames/sit/00.png" alt="sit" width="80"> | `sit` | 절전중 / 쉬는중 / 잠깐휴식 |
-| <img src="assets/generated/frames/sleep/00.png" alt="sleep" width="80"> | `sleep` | Zzz.. / 수면중 / 충전중 |
-| <img src="assets/generated/frames/pout/00.png" alt="pout" width="80"> | `pout` | 억까임 |
-| <img src="assets/generated/frames/surprise/00.png" alt="surprise" width="80"> | `surprise` | 어라? |
-| <img src="assets/generated/frames/sweep/00.png" alt="sweep" width="80"> | `sweep` | 청소각 |
-| <img src="assets/generated/frames/walk/00.png" alt="walk" width="80"> | `walk` | 순찰중 |
-| <img src="assets/generated/frames/half_right/00.png" alt="half_right" width="80"> | `half_right` | 반만 맞습니다 |
-| <img src="assets/generated/frames/welcome_agi/00.png" alt="welcome_agi" width="80"> | `welcome_agi` | AGI 가즈아 / AGI 즈라 / 특이점각 |
-| <img src="assets/generated/frames/agi_box/00.png" alt="agi_box" width="80"> | `agi_box` | 박스행 |
-| <img src="assets/generated/frames/drag_dangle/00.png" alt="drag_dangle" width="80"> | `drag_dangle` | 살려줘 |
-| <img src="assets/generated/frames/scroll_tickle/00.png" alt="scroll_tickle" width="80"> | `scroll_tickle` | 아ㅋㅋ |
-| <img src="assets/generated/frames/bonk/00.png" alt="bonk" width="80"> | `bonk` | 아야 / 딱콩! / 너무해 |
+| Preview                                                                                 | Action          | Caption                          |
+| --------------------------------------------------------------------------------------- | --------------- | -------------------------------- |
+| <img src="assets/generated/frames/idle/00.png" alt="idle" width="80">                   | `idle`          | 멍...                            |
+| <img src="assets/generated/frames/wave/00.png" alt="wave" width="80">                   | `wave`          | ㅎㅇ                             |
+| <img src="assets/generated/frames/think/00.png" alt="think" width="80">                 | `think`         | 흠...                            |
+| <img src="assets/generated/frames/typing/00.png" alt="typing" width="80">               | `typing`        | 토큰입력중 / 타닥타닥 / 작성중   |
+| <img src="assets/generated/frames/cheer/00.png" alt="cheer" width="80">                 | `cheer`         | 힘내 휴먼 / 할수있다 / 가보자    |
+| <img src="assets/generated/frames/sit/00.png" alt="sit" width="80">                     | `sit`           | 절전중 / 쉬는중 / 잠깐휴식       |
+| <img src="assets/generated/frames/sleep/00.png" alt="sleep" width="80">                 | `sleep`         | Zzz.. / 수면중 / 충전중          |
+| <img src="assets/generated/frames/pout/00.png" alt="pout" width="80">                   | `pout`          | 억까임                           |
+| <img src="assets/generated/frames/surprise/00.png" alt="surprise" width="80">           | `surprise`      | 어라?                            |
+| <img src="assets/generated/frames/sweep/00.png" alt="sweep" width="80">                 | `sweep`         | 청소각                           |
+| <img src="assets/generated/frames/walk/00.png" alt="walk" width="80">                   | `walk`          | 순찰중                           |
+| <img src="assets/generated/frames/half_right/00.png" alt="half_right" width="80">       | `half_right`    | 반만 맞습니다                    |
+| <img src="assets/generated/frames/welcome_agi/00.png" alt="welcome_agi" width="80">     | `welcome_agi`   | AGI 가즈아 / AGI 즈라 / 특이점각 |
+| <img src="assets/generated/frames/agi_box/00.png" alt="agi_box" width="80">             | `agi_box`       | 박스행                           |
+| <img src="assets/generated/frames/drag_dangle/00.png" alt="drag_dangle" width="80">     | `drag_dangle`   | 살려줘                           |
+| <img src="assets/generated/frames/scroll_tickle/00.png" alt="scroll_tickle" width="80"> | `scroll_tickle` | 아ㅋㅋ                           |
+| <img src="assets/generated/frames/bonk/00.png" alt="bonk" width="80">                   | `bonk`          | 아야 / 딱콩! / 너무해            |
 
 ## Runtime Captions
 
-| Situation | Caption |
-|---|---|
-| 시작 | 부팅완 |
-| 따라가기 켜짐 | 추적 on |
-| 따라가기 꺼짐 | 추적 off |
-| 마우스 추적 중 | 추적중 |
-| 마우스를 놓침 | 놓침ㅋ |
-| 마우스가 가까움 | 왔냐 |
-| 산책 중 | 순찰중 |
-| 산책 종료 | 복귀완 |
-| 타이핑 후 대기 | 한가함 |
-| 드래그 후 놓음 | 살았다 |
-| hover 진입 | ㅎㅇㅎㅇ |
-| 활동 감지 | 일하는척 |
-| 충전 중 | 충전 n% |
-| 새벽 시간대 | 야간모드 |
+| Situation       | Caption  |
+| --------------- | -------- |
+| 시작            | 부팅완   |
+| 따라가기 켜짐   | 추적 on  |
+| 따라가기 꺼짐   | 추적 off |
+| 마우스 추적 중  | 추적중   |
+| 마우스를 놓침   | 놓침ㅋ   |
+| 마우스가 가까움 | 왔냐     |
+| 산책 중         | 순찰중   |
+| 산책 종료       | 복귀완   |
+| 타이핑 후 대기  | 한가함   |
+| 드래그 후 놓음  | 살았다   |
+| hover 진입      | ㅎㅇㅎㅇ |
+| 활동 감지       | 일하는척 |
+| 충전 중         | 충전 n%  |
+| 새벽 시간대     | 야간모드 |
 
 ## Project Structure
 
@@ -133,3 +133,36 @@ python scripts/build_pet_assets.py
 ```bash
 python -m py_compile pet.py scripts/remove_green_and_despill.py scripts/remaster_assets.py scripts/clean_green_spill.py scripts/build_pet_assets.py
 ```
+
+## Fork Additions
+
+이 아래 항목들은 원본 저장소 설명에 섞지 않고, 이 포크에서 추가한 내용만 따로 정리한 섹션입니다.
+
+<p align="center">
+  <img src="add_codex_sample_img.png" alt="GPZZ ADD CODEX" width="220">
+</p>
+
+### Codex Integration
+
+- 실행 중인 사용자 프로필의 `.codex/state_*.sqlite`와 현재 프로젝트의 Codex 세션 JSONL을 읽기 전용으로 확인합니다.
+- 현재 프로젝트와 연결된 Codex 스레드가 있으면 CPU/RAM 패널 위에 `CODEX` 박스가 추가됩니다.
+- 패널에는 현재 세션 기준 `5시간 남은량`, `1주일 남은량`이 표시됩니다.
+- Codex가 응답 중이거나 답변 본문을 남기면 펫 말풍선에 짧게 표시합니다.
+- Codex가 설치되어 있지 않거나 현재 프로젝트와 연결된 스레드가 없으면 기존 CPU/RAM 패널만 표시됩니다.
+
+### 추가 메뉴 옵션
+
+- 오른쪽 클릭 > `Codex 표시`: 켜기 / 끄기 / 새로고침
+- 오른쪽 클릭 > `윈도우 시작시 실행`: 현재 사용자 기준 Windows 시작 프로그램에 등록/해제합니다.
+
+### EXE Build
+
+포크 버전은 단일 실행 파일로도 빌드할 수 있습니다.
+
+```bash
+python -m PyInstaller --noconfirm --clean --windowed --onefile --name GP-Chan --add-data "assets/generated;assets/generated" pet.py
+```
+
+빌드 결과물:
+
+- `dist/GP-Chan.exe`
