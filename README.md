@@ -56,44 +56,44 @@ python pet.py
 
 ## Actions
 
-| Preview | Action | Caption |
-|---|---|---|
-| <img src="assets/generated/frames/idle/00.png" alt="idle" width="80"> | `idle` | 멍... |
-| <img src="assets/generated/frames/wave/00.png" alt="wave" width="80"> | `wave` | ㅎㅇ |
-| <img src="assets/generated/frames/think/00.png" alt="think" width="80"> | `think` | 흠... |
-| <img src="assets/generated/frames/typing/00.png" alt="typing" width="80"> | `typing` | 토큰입력중 / 타닥타닥 / 작성중 |
-| <img src="assets/generated/frames/cheer/00.png" alt="cheer" width="80"> | `cheer` | 힘내 휴먼 / 할수있다 / 가보자 |
-| <img src="assets/generated/frames/sit/00.png" alt="sit" width="80"> | `sit` | 절전중 / 쉬는중 / 잠깐휴식 |
-| <img src="assets/generated/frames/sleep/00.png" alt="sleep" width="80"> | `sleep` | Zzz.. / 수면중 / 충전중 |
-| <img src="assets/generated/frames/pout/00.png" alt="pout" width="80"> | `pout` | 억까임 |
-| <img src="assets/generated/frames/surprise/00.png" alt="surprise" width="80"> | `surprise` | 어라? |
-| <img src="assets/generated/frames/sweep/00.png" alt="sweep" width="80"> | `sweep` | 청소각 |
-| <img src="assets/generated/frames/walk/00.png" alt="walk" width="80"> | `walk` | 순찰중 |
-| <img src="assets/generated/frames/half_right/00.png" alt="half_right" width="80"> | `half_right` | 반만 맞습니다 |
-| <img src="assets/generated/frames/welcome_agi/00.png" alt="welcome_agi" width="80"> | `welcome_agi` | AGI 가즈아 / AGI 즈라 / 특이점각 |
-| <img src="assets/generated/frames/agi_box/00.png" alt="agi_box" width="80"> | `agi_box` | 박스행 |
-| <img src="assets/generated/frames/drag_dangle/00.png" alt="drag_dangle" width="80"> | `drag_dangle` | 살려줘 |
-| <img src="assets/generated/frames/scroll_tickle/00.png" alt="scroll_tickle" width="80"> | `scroll_tickle` | 아ㅋㅋ |
-| <img src="assets/generated/frames/bonk/00.png" alt="bonk" width="80"> | `bonk` | 아야 / 딱콩! / 너무해 |
+| Preview                                                                                 | Action          | Caption                          |
+| --------------------------------------------------------------------------------------- | --------------- | -------------------------------- |
+| <img src="assets/generated/frames/idle/00.png" alt="idle" width="80">                   | `idle`          | 멍...                            |
+| <img src="assets/generated/frames/wave/00.png" alt="wave" width="80">                   | `wave`          | ㅎㅇ                             |
+| <img src="assets/generated/frames/think/00.png" alt="think" width="80">                 | `think`         | 흠...                            |
+| <img src="assets/generated/frames/typing/00.png" alt="typing" width="80">               | `typing`        | 토큰입력중 / 타닥타닥 / 작성중   |
+| <img src="assets/generated/frames/cheer/00.png" alt="cheer" width="80">                 | `cheer`         | 힘내 휴먼 / 할수있다 / 가보자    |
+| <img src="assets/generated/frames/sit/00.png" alt="sit" width="80">                     | `sit`           | 절전중 / 쉬는중 / 잠깐휴식       |
+| <img src="assets/generated/frames/sleep/00.png" alt="sleep" width="80">                 | `sleep`         | Zzz.. / 수면중 / 충전중          |
+| <img src="assets/generated/frames/pout/00.png" alt="pout" width="80">                   | `pout`          | 억까임                           |
+| <img src="assets/generated/frames/surprise/00.png" alt="surprise" width="80">           | `surprise`      | 어라?                            |
+| <img src="assets/generated/frames/sweep/00.png" alt="sweep" width="80">                 | `sweep`         | 청소각                           |
+| <img src="assets/generated/frames/walk/00.png" alt="walk" width="80">                   | `walk`          | 순찰중                           |
+| <img src="assets/generated/frames/half_right/00.png" alt="half_right" width="80">       | `half_right`    | 반만 맞습니다                    |
+| <img src="assets/generated/frames/welcome_agi/00.png" alt="welcome_agi" width="80">     | `welcome_agi`   | AGI 가즈아 / AGI 즈라 / 특이점각 |
+| <img src="assets/generated/frames/agi_box/00.png" alt="agi_box" width="80">             | `agi_box`       | 박스행                           |
+| <img src="assets/generated/frames/drag_dangle/00.png" alt="drag_dangle" width="80">     | `drag_dangle`   | 살려줘                           |
+| <img src="assets/generated/frames/scroll_tickle/00.png" alt="scroll_tickle" width="80"> | `scroll_tickle` | 아ㅋㅋ                           |
+| <img src="assets/generated/frames/bonk/00.png" alt="bonk" width="80">                   | `bonk`          | 아야 / 딱콩! / 너무해            |
 
 ## Runtime Captions
 
-| Situation | Caption |
-|---|---|
-| 시작 | 부팅완 |
-| 따라가기 켜짐 | 추적 on |
-| 따라가기 꺼짐 | 추적 off |
-| 마우스 추적 중 | 추적중 |
-| 마우스를 놓침 | 놓침ㅋ |
-| 마우스가 가까움 | 왔냐 |
-| 산책 중 | 순찰중 |
-| 산책 종료 | 복귀완 |
-| 타이핑 후 대기 | 한가함 |
-| 드래그 후 놓음 | 살았다 |
-| hover 진입 | ㅎㅇㅎㅇ |
-| 활동 감지 | 일하는척 |
-| 충전 중 | 충전 n% |
-| 새벽 시간대 | 야간모드 |
+| Situation       | Caption  |
+| --------------- | -------- |
+| 시작            | 부팅완   |
+| 따라가기 켜짐   | 추적 on  |
+| 따라가기 꺼짐   | 추적 off |
+| 마우스 추적 중  | 추적중   |
+| 마우스를 놓침   | 놓침ㅋ   |
+| 마우스가 가까움 | 왔냐     |
+| 산책 중         | 순찰중   |
+| 산책 종료       | 복귀완   |
+| 타이핑 후 대기  | 한가함   |
+| 드래그 후 놓음  | 살았다   |
+| hover 진입      | ㅎㅇㅎㅇ |
+| 활동 감지       | 일하는척 |
+| 충전 중         | 충전 n%  |
+| 새벽 시간대     | 야간모드 |
 
 ## Project Structure
 
@@ -137,6 +137,10 @@ python -m py_compile pet.py scripts/remove_green_and_despill.py scripts/remaster
 ## Fork Additions
 
 이 아래 항목들은 원본 저장소 설명에 섞지 않고, 이 포크에서 추가한 내용만 따로 정리한 섹션입니다.
+
+<p align="center">
+  <img src="add_codex_sample_img.png" alt="GPZZ ADD CODEX" width="220">
+</p>
 
 ### Codex Integration
 
